@@ -39,8 +39,8 @@ export default function MessagesPage() {
         throw new Error('No trainer assigned')
       }
       const response = await messageApi.send({
-        receiverId: student.trainer_id,
-        content,
+        recipientId: student.trainer_id,
+        message: content,
       })
       return response.data
     },
@@ -107,11 +107,10 @@ export default function MessagesPage() {
                     </Avatar>
                     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
                       <div
-                        className={`rounded-lg px-4 py-2 ${
-                          isMe
+                        className={`rounded-lg px-4 py-2 ${isMe
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-muted'
-                        }`}
+                          }`}
                       >
                         <p className="text-sm">{message.content}</p>
                       </div>
