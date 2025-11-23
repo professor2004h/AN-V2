@@ -43,7 +43,7 @@ jobs:
         docker build \
           --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
           --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-          --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.apranova.com \
+          --build-arg NEXT_PUBLIC_BACKEND_URL=http://apranova-lms-alb-v2-1395433124.ap-southeast-2.elb.amazonaws.com:3001 \
           --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }} \
           -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG
@@ -56,6 +56,18 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         cd backend
+        # Inject secrets into .env.production
+        sed -i "s|PLACEHOLDER_SUPABASE_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" .env.production
+        sed -i "s|PLACEHOLDER_SUPABASE_SERVICE_ROLE_KEY|${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}|g" .env.production
+        sed -i "s|PLACEHOLDER_SUPABASE_DB_PASSWORD|${{ secrets.DB_PASSWORD }}|g" .env.production
+        sed -i "s|PLACEHOLDER_STRIPE_SECRET_KEY|${{ secrets.STRIPE_SECRET_KEY }}|g" .env.production
+        sed -i "s|PLACEHOLDER_STRIPE_WEBHOOK_SECRET|${{ secrets.STRIPE_WEBHOOK_SECRET }}|g" .env.production
+        sed -i "s|PLACEHOLDER_RESEND_API_KEY|${{ secrets.RESEND_API_KEY }}|g" .env.production
+        sed -i "s|PLACEHOLDER_JWT_SECRET|${{ secrets.JWT_SECRET }}|g" .env.production
+        sed -i "s|PLACEHOLDER_CODE_SERVER_PASSWORD|${{ secrets.CODE_SERVER_PASSWORD }}|g" .env.production
+        sed -i "s|PLACEHOLDER_AWS_ACCESS_KEY_ID|${{ secrets.AWS_ACCESS_KEY_ID }}|g" .env.production
+        sed -i "s|PLACEHOLDER_AWS_SECRET_ACCESS_KEY|${{ secrets.AWS_SECRET_ACCESS_KEY }}|g" .env.production
+        
         docker build -t $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
         docker tag $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
