@@ -200,5 +200,22 @@ jobs:
 
     - name: Update ECS Services
       run: |
-        aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_FRONTEND_SERVICE --force-new-deployment
-        aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_BACKEND_SERVICE --force-new-deployment
+        echo "Listing services in cluster..."
+        aws ecs list-services --cluster $ECS_CLUSTER --region $AWS_REGION
+        
+        echo "Attempting to update services..."
+        # Try to update frontend service
+        if aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_FRONTEND_SERVICE --region $AWS_REGION 2>/dev/null | grep -q "serviceName"; then
+          echo "Updating frontend service..."
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_FRONTEND_SERVICE --force-new-deployment --region $AWS_REGION
+        else
+          echo "Frontend service not found, skipping..."
+        fi
+        
+        # Try to update backend service
+        if aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_BACKEND_SERVICE --region $AWS_REGION 2>/dev/null | grep -q "serviceName"; then
+          echo "Updating backend service..."
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_BACKEND_SERVICE --force-new-deployment --region $AWS_REGION
+        else
+          echo "Backend service not found, skipping..."
+        fi
