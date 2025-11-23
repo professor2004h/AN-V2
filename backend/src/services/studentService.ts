@@ -141,6 +141,22 @@ export class StudentService {
     return data;
   }
 
+  async updateStudent(studentId: string, updateData: any) {
+    const { data, error } = await supabaseAdmin
+      .from('students')
+      .update(updateData)
+      .eq('id', studentId)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed to update student', { studentId, error });
+      throw new AppError(500, 'Failed to update student');
+    }
+
+    return data;
+  }
+
   async getStudentsByTrainer(trainerId: string) {
     const { data, error } = await supabaseAdmin
       .from('students')
