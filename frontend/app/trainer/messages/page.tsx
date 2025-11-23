@@ -32,7 +32,7 @@ export default function MessagesPage() {
     queryKey: ['messages', selectedStudent],
     queryFn: async () => {
       const response = await messageApi.getAll()
-      return response.data.filter((m: any) => 
+      return response.data.filter((m: any) =>
         m.sender_id === selectedStudent || m.receiver_id === selectedStudent
       )
     },
@@ -42,8 +42,8 @@ export default function MessagesPage() {
   const sendMutation = useMutation({
     mutationFn: async (content: string) => {
       const response = await messageApi.send({
-        receiverId: selectedStudent,
-        content,
+        recipientId: selectedStudent,
+        message: content,
       })
       return response.data
     },
@@ -108,9 +108,8 @@ export default function MessagesPage() {
                         </Avatar>
                         <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
                           <div
-                            className={`rounded-lg px-4 py-2 ${
-                              isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                            }`}
+                            className={`rounded-lg px-4 py-2 ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                              }`}
                           >
                             <p className="text-sm">{message.content}</p>
                           </div>
