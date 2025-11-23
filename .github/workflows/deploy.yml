@@ -159,19 +159,13 @@ jobs:
         # ECS Cluster (use cluster name, not ARN)
         terraform import 'aws_ecs_cluster.main' 'apranova-lms-cluster' 2>/dev/null || true
         
-        # Auto Scaling Groups
+        # Auto Scaling Groups (backend only - frontend uses Fargate)
         terraform import 'aws_autoscaling_group.backend' 'apranova-lms-backend-asg' 2>/dev/null || true
-        terraform import 'aws_autoscaling_group.frontend' 'apranova-lms-frontend-asg' 2>/dev/null || true
         
-        # Launch Templates
-        BACKEND_LT_ID=$(aws ec2 describe-launch-templates --filters "Name=tag:Name,Values=apranova-lms-backend-lt" --query 'LaunchTemplates[0].LaunchTemplateId' --output text 2>/dev/null)
+        # Launch Templates (backend only)
+        BACKEND_LT_ID=$(aws ec2 describe-launch-templates --filters "Name=tag:Name,Values=apranova-lms-backend-instance" --query 'LaunchTemplates[0].LaunchTemplateId' --output text 2>/dev/null)
         if [ "$BACKEND_LT_ID" != "None" ] && [ ! -z "$BACKEND_LT_ID" ]; then
           terraform import 'aws_launch_template.backend' "$BACKEND_LT_ID" 2>/dev/null || true
-        fi
-        
-        FRONTEND_LT_ID=$(aws ec2 describe-launch-templates --filters "Name=tag:Name,Values=apranova-lms-frontend-lt" --query 'LaunchTemplates[0].LaunchTemplateId' --output text 2>/dev/null)
-        if [ "$FRONTEND_LT_ID" != "None" ] && [ ! -z "$FRONTEND_LT_ID" ]; then
-          terraform import 'aws_launch_template.frontend' "$FRONTEND_LT_ID" 2>/dev/null || true
         fi
 
     - name: Terraform Plan
