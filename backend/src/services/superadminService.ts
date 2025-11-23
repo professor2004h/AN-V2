@@ -23,7 +23,7 @@ export class SuperAdminService {
 
     // Calculate totals
     const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
-    
+
     // Revenue by track
     const revenueByTrack = payments.reduce((acc, p) => {
       const track = p.metadata?.track || 'unknown';
@@ -55,7 +55,7 @@ export class SuperAdminService {
 
   private calculateMonthlyRevenue(payments: any[]) {
     const monthlyData: Record<string, number> = {};
-    
+
     payments.forEach(payment => {
       const date = new Date(payment.created_at);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -193,7 +193,8 @@ export class SuperAdminService {
       .eq('status', 'completed');
 
     const revenuePerBatch = (batchRevenue || []).reduce((acc, p) => {
-      const batchName = p.student?.batch?.name || 'No Batch';
+      const batch = Array.isArray(p.student?.batch) ? p.student?.batch[0] : p.student?.batch;
+      const batchName = batch?.name || 'No Batch';
       acc[batchName] = (acc[batchName] || 0) + p.amount;
       return acc;
     }, {} as Record<string, number>);
@@ -213,7 +214,9 @@ export class SuperAdminService {
       .eq('status', 'completed');
 
     const revenuePerTrainer = (trainerRevenue || []).reduce((acc, p) => {
-      const trainerName = p.student?.trainer?.profile?.full_name || 'Unassigned';
+      const trainer = Array.isArray(p.student?.trainer) ? p.student?.trainer[0] : p.student?.trainer;
+      const profile = Array.isArray(trainer?.profile) ? trainer?.profile[0] : trainer?.profile;
+      const trainerName = profile?.full_name || 'Unassigned';
       acc[trainerName] = (acc[trainerName] || 0) + p.amount;
       return acc;
     }, {} as Record<string, number>);
