@@ -30,6 +30,43 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    # Run Terraform FIRST to create ECR repositories and other infrastructure
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+
+    - name: Terraform Init
+      working-directory: ./terraform
+      run: terraform init
+
+    - name: Terraform Plan
+      working-directory: ./terraform
+      env:
+        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
+      run: terraform plan -out=tfplan
+
+    - name: Terraform Apply
+      working-directory: ./terraform
+      env:
+        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
+      run: terraform apply -auto-approve tfplan
+
+    # NOW build and push Docker images (ECR repos exist now)
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
@@ -72,43 +109,6 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
         docker tag $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
         docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
-
-    # Terraform enabled for new AWS account deployment
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-
-    - name: Terraform Init
-      working-directory: ./terraform
-      run: terraform init
-
-    - name: Terraform Plan
-      working-directory: ./terraform
-      env:
-        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
-        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
-        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
-      run: terraform plan -out=tfplan
-
-    - name: Terraform Apply
-      working-directory: ./terraform
-      env:
-        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
-        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
-        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
-      run: terraform apply -auto-approve tfplan
-    #   run: terraform apply -auto-approve tfplan
 
     - name: Update ECS Services
       run: |
