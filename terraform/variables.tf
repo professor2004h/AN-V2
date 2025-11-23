@@ -1,6 +1,6 @@
 variable "aws_region" {
   description = "AWS Region"
-  default     = "ap-southeast-2"
+  default     = "us-east-1"
 }
 
 variable "app_name" {
@@ -25,7 +25,7 @@ variable "public_subnets" {
 
 variable "availability_zones" {
   description = "Availability Zones"
-  default     = ["ap-southeast-2a", "ap-southeast-2b"]
+  default     = ["us-east-1a", "us-east-1b"]
 }
 
 variable "container_port_frontend" {

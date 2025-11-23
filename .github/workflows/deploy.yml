@@ -73,141 +73,41 @@ jobs:
         docker tag $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
         docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
 
-    # TERRAFORM TEMPORARILY DISABLED - DO NOT ENABLE UNTIL IMPORT ISSUES ARE RESOLVED
-    # Terraform was trying to destroy and recreate in-use subnets, causing deployment failures
-    # Current infrastructure is stable - only updating Docker images and ECS services
-    
-    # - name: Setup Terraform
-    #   uses: hashicorp/setup-terraform@v1
-    #
-    # - name: Terraform Init
-    #   working-directory: ./terraform
-    #   run: terraform init
-    #
-    # - name: Import Existing Resources
-    #   working-directory: ./terraform
-    #   continue-on-error: true
-    #   env:
-    #     TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
-    #     TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
-    #     TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-    #     TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-    #     TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-    #     TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-    #     TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-    #     TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-    #     TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
-    #   run: |
-    #     # Import existing resources to avoid "already exists" errors
-    #     # VPC and Networking (using the correct VPC: vpc-03c570ff139fcf5ba)
-    #     VPC_ID="vpc-03c570ff139fcf5ba"
-    #     terraform import 'aws_vpc.main' "$VPC_ID" 2>/dev/null || true
-    #     terraform import 'aws_internet_gateway.main' $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text) 2>/dev/null || true
-    #     
-    #     # Import subnets
-    #     SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-*" --query 'Subnets[*].SubnetId' --output text)
-    #     INDEX=0
-    #     for SUBNET_ID in $SUBNET_IDS; do
-    #       terraform import "aws_subnet.public[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
-    #       INDEX=$((INDEX+1))
-    #     done
-    #     
-    #     # Import private subnets
-    #     PRIVATE_SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-private-*" --query 'Subnets[*].SubnetId' --output text)
-    #     INDEX=0
-    #     for SUBNET_ID in $PRIVATE_SUBNET_IDS; do
-    #       terraform import "aws_subnet.private[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
-    #       INDEX=$((INDEX+1))
-    #     done
-    #     
-    #     # Import security groups
-    #     terraform import 'aws_security_group.alb' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-alb-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-    #     terraform import 'aws_security_group.ecs_tasks' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-ecs-tasks-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-    #     terraform import 'aws_security_group.redis' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-redis-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-    #     terraform import 'aws_security_group.efs' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-efs-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-    #     
-    #     # Import route tables
-    #     terraform import 'aws_route_table.public' $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-rt" --query 'RouteTables[0].RouteTableId' --output text) 2>/dev/null || true
-    #     
-    #     # ALB and Target Groups
-    #     ALB_ARN=$(aws elbv2 describe-load-balancers --names apranova-lms-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null)
-    #     if [ "$ALB_ARN" != "None" ] && [ ! -z "$ALB_ARN" ]; then
-    #       terraform import 'aws_lb.main' "$ALB_ARN" 2>/dev/null || true
-    #       
-    #       # Import ALB listeners
-    #       LISTENER_ARNS=$(aws elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" --query 'Listeners[*].ListenerArn' --output text)
-    #       for LISTENER_ARN in $LISTENER_ARNS; do
-    #         PORT=$(aws elbv2 describe-listeners --listener-arns "$LISTENER_ARN" --query 'Listeners[0].Port' --output text)
-    #         if [ "$PORT" == "80" ]; then
-    #           terraform import 'aws_lb_listener.http' "$LISTENER_ARN" 2>/dev/null || true
-    #         elif [ "$PORT" == "443" ]; then
-    #           terraform import 'aws_lb_listener.https' "$LISTENER_ARN" 2>/dev/null || true
-    #         fi
-    #       done
-    #     fi
-    #     
-    #     terraform import 'aws_lb_target_group.frontend' $(aws elbv2 describe-target-groups --names apranova-lms-frontend-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null) 2>/dev/null || true
-    #     terraform import 'aws_lb_target_group.backend' $(aws elbv2 describe-target-groups --names apranova-lms-backend-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null) 2>/dev/null || true
-    #     
-    #     # EFS
-    #     terraform import 'aws_efs_file_system.main' 'fs-05182c567cb694a8f' 2>/dev/null || true
-    #     
-    #     # Import EFS Mount Targets
-    #     MOUNT_TARGET_IDS=$(aws efs describe-mount-targets --file-system-id fs-05182c567cb694a8f --query 'MountTargets[*].MountTargetId' --output text 2>/dev/null)
-    #     INDEX=0
-    #     for MT_ID in $MOUNT_TARGET_IDS; do
-    #       terraform import "aws_efs_mount_target.main[$INDEX]" "$MT_ID" 2>/dev/null || true
-    #       INDEX=$((INDEX+1))
-    #     done
-    #     
-    #     # IAM
-    #     terraform import 'aws_iam_role.ecs_execution_role' 'apranova-lms-ecs-execution-role' 2>/dev/null || true
-    #     terraform import 'aws_iam_role.ecs_task_role' 'apranova-lms-ecs-task-role' 2>/dev/null || true
-    #     terraform import 'aws_iam_role.ecs_instance_role' 'apranova-lms-ecs-instance-role' 2>/dev/null || true
-    #     terraform import 'aws_iam_instance_profile.ecs_instance_profile' 'apranova-lms-ecs-instance-profile' 2>/dev/null || true
-    #     terraform import 'aws_iam_policy.ecs_task_policy' $(aws iam list-policies --scope Local --query "Policies[?PolicyName=='apranova-lms-ecs-task-policy'].Arn" --output text) 2>/dev/null || true
-    #     
-    #     # ElastiCache
-    #     terraform import 'aws_elasticache_subnet_group.main' 'apranova-lms-redis-subnet-group' 2>/dev/null || true
-    #     
-    #     # ECS Cluster (use cluster name, not ARN)
-    #     terraform import 'aws_ecs_cluster.main' 'apranova-lms-cluster' 2>/dev/null || true
-    #     
-    #     # Auto Scaling Groups (backend only - frontend uses Fargate)
-    #     terraform import 'aws_autoscaling_group.backend' 'apranova-lms-backend-asg' 2>/dev/null || true
-    #     
-    #     # Launch Templates (backend only)
-    #     BACKEND_LT_ID=$(aws ec2 describe-launch-templates --filters "Name=tag:Name,Values=apranova-lms-backend-instance" --query 'LaunchTemplates[0].LaunchTemplateId' --output text 2>/dev/null)
-    #     if [ "$BACKEND_LT_ID" != "None" ] && [ ! -z "$BACKEND_LT_ID" ]; then
-    #       terraform import 'aws_launch_template.backend' "$BACKEND_LT_ID" 2>/dev/null || true
-    #     fi
-    #
-    # - name: Terraform Plan
-    #   working-directory: ./terraform
-    #   env:
-    #     TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
-    #     TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
-    #     TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-    #     TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-    #     TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-    #     TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-    #     TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-    #     TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-    #     TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
-    #   run: terraform plan -out=tfplan
-    #
-    # - name: Terraform Apply
-    #   working-directory: ./terraform
-    #   env:
-    #     TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
-    #     TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
-    #     TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-    #     TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-    #     TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
-    #     TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-    #     TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-    #     TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-    #     TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
+    # Terraform enabled for new AWS account deployment
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+
+    - name: Terraform Init
+      working-directory: ./terraform
+      run: terraform init
+
+    - name: Terraform Plan
+      working-directory: ./terraform
+      env:
+        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
+      run: terraform plan -out=tfplan
+
+    - name: Terraform Apply
+      working-directory: ./terraform
+      env:
+        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
+      run: terraform apply -auto-approve tfplan
     #   run: terraform apply -auto-approve tfplan
 
     - name: Update ECS Services
