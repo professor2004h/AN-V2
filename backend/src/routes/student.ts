@@ -55,6 +55,17 @@ router.get('/me/tasks', async (req: AuthRequest, res, next) => {
   }
 });
 
+// Update student profile
+router.patch('/me', async (req: AuthRequest, res, next) => {
+  try {
+    const student = await studentService.getStudentByUserId(req.user!.id);
+    const updatedStudent = await studentService.updateStudent(student.id, req.body);
+    res.json(updatedStudent);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get student by ID (for trainers/admins)
 router.get('/:id', async (req: AuthRequest, res, next) => {
   try {

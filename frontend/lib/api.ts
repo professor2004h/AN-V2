@@ -52,6 +52,7 @@ export const studentApi = {
   getCurrentProject: () => api.get('/students/me/current-project'),
   getTasks: (status?: string) => api.get('/students/me/tasks', { params: { status } }),
   getById: (id: string) => api.get(`/students/${id}`),
+  updateProfile: (data: any) => api.patch('/students/me', data),
 }
 
 export const projectApi = {
