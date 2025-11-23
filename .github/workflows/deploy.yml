@@ -83,18 +83,58 @@ jobs:
         TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
       run: |
         # Import existing resources to avoid "already exists" errors
-        terraform import 'aws_vpc.main' $(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=apranova-lms-vpc" --query 'Vpcs[0].VpcId' --output text) 2>/dev/null || true
-        terraform import 'aws_lb.main' $(aws elbv2 describe-load-balancers --names apranova-lms-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text) 2>/dev/null || true
-        terraform import 'aws_lb_target_group.frontend' $(aws elbv2 describe-target-groups --names apranova-lms-frontend-tg --query 'TargetGroups[0].TargetGroupArn' --output text) 2>/dev/null || true
-        terraform import 'aws_lb_target_group.backend' $(aws elbv2 describe-target-groups --names apranova-lms-backend-tg --query 'TargetGroups[0].TargetGroupArn' --output text) 2>/dev/null || true
+        # VPC and Networking
+        VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=apranova-lms-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
+        if [ "$VPC_ID" != "None" ] && [ ! -z "$VPC_ID" ]; then
+          terraform import 'aws_vpc.main' "$VPC_ID" 2>/dev/null || true
+          terraform import 'aws_internet_gateway.main' $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text) 2>/dev/null || true
+          
+          # Import subnets
+          SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-*" --query 'Subnets[*].SubnetId' --output text)
+          INDEX=0
+          for SUBNET_ID in $SUBNET_IDS; do
+            terraform import "aws_subnet.public[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
+            INDEX=$((INDEX+1))
+          done
+          
+          # Import private subnets
+          PRIVATE_SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-private-*" --query 'Subnets[*].SubnetId' --output text)
+          INDEX=0
+          for SUBNET_ID in $PRIVATE_SUBNET_IDS; do
+            terraform import "aws_subnet.private[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
+            INDEX=$((INDEX+1))
+          done
+          
+          # Import security groups
+          terraform import 'aws_security_group.alb' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-alb-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+          terraform import 'aws_security_group.ecs_tasks' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-ecs-tasks-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+          terraform import 'aws_security_group.redis' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-redis-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+          terraform import 'aws_security_group.efs' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-efs-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+          
+          # Import route tables
+          terraform import 'aws_route_table.public' $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-rt" --query 'RouteTables[0].RouteTableId' --output text) 2>/dev/null || true
+        fi
+        
+        # ALB and Target Groups
+        terraform import 'aws_lb.main' $(aws elbv2 describe-load-balancers --names apranova-lms-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null) 2>/dev/null || true
+        terraform import 'aws_lb_target_group.frontend' $(aws elbv2 describe-target-groups --names apranova-lms-frontend-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null) 2>/dev/null || true
+        terraform import 'aws_lb_target_group.backend' $(aws elbv2 describe-target-groups --names apranova-lms-backend-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null) 2>/dev/null || true
+        
+        # EFS
         terraform import 'aws_efs_file_system.main' 'fs-05182c567cb694a8f' 2>/dev/null || true
+        
+        # IAM
         terraform import 'aws_iam_role.ecs_execution_role' 'apranova-lms-ecs-execution-role' 2>/dev/null || true
         terraform import 'aws_iam_role.ecs_task_role' 'apranova-lms-ecs-task-role' 2>/dev/null || true
         terraform import 'aws_iam_role.ecs_instance_role' 'apranova-lms-ecs-instance-role' 2>/dev/null || true
         terraform import 'aws_iam_instance_profile.ecs_instance_profile' 'apranova-lms-ecs-instance-profile' 2>/dev/null || true
         terraform import 'aws_iam_policy.ecs_task_policy' $(aws iam list-policies --scope Local --query "Policies[?PolicyName=='apranova-lms-ecs-task-policy'].Arn" --output text) 2>/dev/null || true
+        
+        # ElastiCache
         terraform import 'aws_elasticache_subnet_group.main' 'apranova-lms-redis-subnet-group' 2>/dev/null || true
-        terraform import 'aws_ecs_cluster.main' $(aws ecs describe-clusters --clusters apranova-lms-cluster --query 'clusters[0].clusterArn' --output text) 2>/dev/null || true
+        
+        # ECS Cluster (use cluster name, not ARN)
+        terraform import 'aws_ecs_cluster.main' 'apranova-lms-cluster' 2>/dev/null || true
 
     - name: Terraform Plan
       working-directory: ./terraform
