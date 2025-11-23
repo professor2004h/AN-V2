@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tantml:invoke name="@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import { studentApi, submissionApi } from '@/lib/api'
 import { LoadingSpinner } from '@/components/shared/loading-spinner'

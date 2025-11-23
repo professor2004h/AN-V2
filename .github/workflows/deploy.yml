@@ -40,7 +40,12 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         cd frontend
-        docker build -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG .
+        docker build \
+          --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+          --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.apranova.com \
+          --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }} \
+          -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG
         docker tag $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
         docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
