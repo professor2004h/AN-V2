@@ -10,7 +10,7 @@
     "containerDefinitions": [
         {
             "name": "backend",
-            "image": "975050060002.dkr.ecr.ap-southeast-2.amazonaws.com/apranova-lms-backend:latest",
+            "image": "322388074242.dkr.ecr.ap-southeast-2.amazonaws.com/apranova-lms-backend:latest",
             "portMappings": [
                 {
                     "containerPort": 3001,
