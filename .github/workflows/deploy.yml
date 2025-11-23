@@ -66,7 +66,22 @@ jobs:
 
     - name: Terraform Init
       working-directory: ./terraform
-      run: terraform init -backend-config="bucket=apranova-lms-terraform-state" -backend-config="region=ap-southeast-2"
+      run: terraform init
+
+    - name: Import Existing Resources
+      working-directory: ./terraform
+      continue-on-error: true
+      run: |
+        # Import existing resources to avoid "already exists" errors
+        terraform import 'aws_lb.main' $(aws elbv2 describe-load-balancers --names apranova-lms-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text) 2>/dev/null || true
+        terraform import 'aws_lb_target_group.frontend' $(aws elbv2 describe-target-groups --names apranova-lms-frontend-tg --query 'TargetGroups[0].TargetGroupArn' --output text) 2>/dev/null || true
+        terraform import 'aws_lb_target_group.backend' $(aws elbv2 describe-target-groups --names apranova-lms-backend-tg --query 'TargetGroups[0].TargetGroupArn' --output text) 2>/dev/null || true
+        terraform import 'aws_efs_file_system.main' 'fs-05182c567cb694a8f' 2>/dev/null || true
+        terraform import 'aws_iam_role.ecs_execution_role' 'apranova-lms-ecs-execution-role' 2>/dev/null || true
+        terraform import 'aws_iam_role.ecs_task_role' 'apranova-lms-ecs-task-role' 2>/dev/null || true
+        terraform import 'aws_iam_role.ecs_instance_role' 'apranova-lms-ecs-instance-role' 2>/dev/null || true
+        terraform import 'aws_iam_policy.ecs_task_policy' $(aws iam list-policies --scope Local --query "Policies[?PolicyName=='apranova-lms-ecs-task-policy'].Arn" --output text) 2>/dev/null || true
+        terraform import 'aws_elasticache_subnet_group.main' 'apranova-lms-redis-subnet-group' 2>/dev/null || true
 
     - name: Terraform Plan
       working-directory: ./terraform
