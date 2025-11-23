@@ -29,7 +29,7 @@ export default function ProjectsPage() {
   const { data: projects, isLoading } = useQuery({
     queryKey: ['admin', 'projects'],
     queryFn: async () => {
-      const response = await adminApi.getAllProjects()
+      const response = await adminApi.getProjects()
       return response.data
     },
   })
