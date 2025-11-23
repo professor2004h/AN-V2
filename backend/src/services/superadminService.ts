@@ -193,7 +193,8 @@ export class SuperAdminService {
       .eq('status', 'completed');
 
     const revenuePerBatch = (batchRevenue || []).reduce((acc, p) => {
-      const batch = Array.isArray(p.student?.batch) ? p.student?.batch[0] : p.student?.batch;
+      const student: any = Array.isArray(p.student) ? p.student[0] : p.student;
+      const batch = Array.isArray(student?.batch) ? student?.batch[0] : student?.batch;
       const batchName = batch?.name || 'No Batch';
       acc[batchName] = (acc[batchName] || 0) + p.amount;
       return acc;
@@ -214,7 +215,8 @@ export class SuperAdminService {
       .eq('status', 'completed');
 
     const revenuePerTrainer = (trainerRevenue || []).reduce((acc, p) => {
-      const trainer = Array.isArray(p.student?.trainer) ? p.student?.trainer[0] : p.student?.trainer;
+      const student: any = Array.isArray(p.student) ? p.student[0] : p.student;
+      const trainer = Array.isArray(student?.trainer) ? student?.trainer[0] : student?.trainer;
       const profile = Array.isArray(trainer?.profile) ? trainer?.profile[0] : trainer?.profile;
       const trainerName = profile?.full_name || 'Unassigned';
       acc[trainerName] = (acc[trainerName] || 0) + p.amount;
