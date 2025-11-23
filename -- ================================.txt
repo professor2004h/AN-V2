@@ -1,0 +1,156 @@
+-- ============================================
+-- SIMPLE RLS POLICIES FIX
+-- Run this in Supabase SQL Editor
+-- ============================================
+
+-- First, disable RLS on all tables temporarily
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE students DISABLE ROW LEVEL SECURITY;
+ALTER TABLE trainers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE batches DISABLE ROW LEVEL SECURITY;
+ALTER TABLE projects DISABLE ROW LEVEL SECURITY;
+ALTER TABLE student_projects DISABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE payments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
+ALTER TABLE messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE quiz_attempts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE progress_checkpoints DISABLE ROW LEVEL SECURITY;
+ALTER TABLE student_checkpoint_progress DISABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings DISABLE ROW LEVEL SECURITY;
+
+-- Drop all existing policies
+DO $$ 
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT schemaname, tablename, policyname 
+              FROM pg_policies 
+              WHERE schemaname = 'public') 
+    LOOP
+        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || 
+                ' ON ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename);
+    END LOOP;
+END $$;
+
+-- Re-enable RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trainers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE progress_checkpoints ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_checkpoint_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+
+-- ============================================
+-- SIMPLE POLICIES (No recursion, no complexity)
+-- ============================================
+
+-- Profiles: Users can manage their own profile
+CREATE POLICY "profiles_select_own" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "profiles_insert_own" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Students: Users can manage their own student record
+CREATE POLICY "students_select_own" ON students FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "students_update_own" ON students FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "students_insert_own" ON students FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- Trainers: Users can manage their own trainer record
+CREATE POLICY "trainers_select_own" ON trainers FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "trainers_update_own" ON trainers FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "trainers_insert_own" ON trainers FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- Batches: All authenticated users can view
+CREATE POLICY "batches_select_all" ON batches FOR SELECT TO authenticated USING (true);
+
+-- Projects: All authenticated users can view
+CREATE POLICY "projects_select_all" ON projects FOR SELECT TO authenticated USING (true);
+
+-- Student Projects: Students can view/update their own
+CREATE POLICY "student_projects_select_own" ON student_projects FOR SELECT 
+    USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+CREATE POLICY "student_projects_update_own" ON student_projects FOR UPDATE 
+    USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+CREATE POLICY "student_projects_insert_own" ON student_projects FOR INSERT 
+    WITH CHECK (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+
+-- Submissions: Students can manage their own
+CREATE POLICY "submissions_select_own" ON submissions FOR SELECT 
+    USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+CREATE POLICY "submissions_insert_own" ON submissions FOR INSERT 
+    WITH CHECK (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+CREATE POLICY "submissions_update_own" ON submissions FOR UPDATE 
+    USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+
+-- Tasks: Students can view their own
+CREATE POLICY "tasks_select_own" ON tasks FOR SELECT 
+    USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+
+-- Payments: Students can view/insert their own
+CREATE POLICY "payments_select_own" ON payments FOR SELECT 
+    USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+CREATE POLICY "payments_insert_own" ON payments FOR INSERT 
+    WITH CHECK (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+
+-- Notifications: Users can view/update their own
+CREATE POLICY "notifications_select_own" ON notifications FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "notifications_update_own" ON notifications FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "notifications_insert_all" ON notifications FOR INSERT WITH CHECK (true);
+
+-- Messages: Users can view their own messages
+CREATE POLICY "messages_select_own" ON messages FOR SELECT 
+    USING (sender_id = auth.uid() OR recipient_id = auth.uid());
+CREATE POLICY "messages_insert_own" ON messages FOR INSERT WITH CHECK (sender_id = auth.uid());
+
+-- Quizzes: All authenticated users can view
+CREATE POLICY "quizzes_select_all" ON quizzes FOR SELECT TO authenticated USING (true);
+
+-- Quiz Attempts: Students can view/insert their own
+CREATE POLICY "quiz_attempts_select_own" ON quiz_attempts FOR SELECT 
+    USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+CREATE POLICY "quiz_attempts_insert_own" ON quiz_attempts FOR INSERT 
+    WITH CHECK (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+
+-- Progress Checkpoints: All authenticated users can view
+CREATE POLICY "checkpoints_select_all" ON progress_checkpoints FOR SELECT TO authenticated USING (true);
+
+-- Student Checkpoint Progress: Students can manage their own
+CREATE POLICY "student_checkpoint_select_own" ON student_checkpoint_progress FOR SELECT 
+    USING (student_project_id IN (
+        SELECT sp.id FROM student_projects sp 
+        JOIN students s ON sp.student_id = s.id 
+        WHERE s.user_id = auth.uid()
+    ));
+CREATE POLICY "student_checkpoint_update_own" ON student_checkpoint_progress FOR UPDATE 
+    USING (student_project_id IN (
+        SELECT sp.id FROM student_projects sp 
+        JOIN students s ON sp.student_id = s.id 
+        WHERE s.user_id = auth.uid()
+    ));
+CREATE POLICY "student_checkpoint_insert_own" ON student_checkpoint_progress FOR INSERT 
+    WITH CHECK (student_project_id IN (
+        SELECT sp.id FROM student_projects sp 
+        JOIN students s ON sp.student_id = s.id 
+        WHERE s.user_id = auth.uid()
+    ));
+
+-- Analytics Events: Users can insert their own
+CREATE POLICY "analytics_insert_own" ON analytics_events FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- System Settings: All authenticated users can view
+CREATE POLICY "settings_select_all" ON system_settings FOR SELECT TO authenticated USING (true);
+

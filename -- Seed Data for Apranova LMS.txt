@@ -1,0 +1,119 @@
+-- Seed Data for Apranova LMS
+
+-- Insert Data Professional Track Projects
+INSERT INTO projects (title, description, track, project_number, tech_stack, requirements, estimated_hours, difficulty_level) VALUES
+(
+    'Business Analytics Dashboard',
+    'Build an interactive business analytics dashboard using Python, Pandas, PostgreSQL, and Apache Superset. Clean raw data, perform SQL analysis, and create visualizations.',
+    'data_professional',
+    1,
+    ARRAY['Python', 'Pandas', 'PostgreSQL', 'SQL', 'Apache Superset', 'Jupyter Lab'],
+    '{"deliverables": ["Superset Dashboard URL", "SQL queries in GitHub repo", "PDF Insights Report"], "requirements": ["Clean CSV dataset with Pandas", "Load data into PostgreSQL", "Write complex SQL queries", "Build interactive Superset dashboard", "Create executive summary report"]}'::jsonb,
+    40,
+    1
+),
+(
+    'Automated ETL Pipeline',
+    'Create an automated ETL pipeline that extracts data from APIs, transforms it with Pandas, loads into PostgreSQL, and sends daily email reports.',
+    'data_professional',
+    2,
+    ARRAY['Python', 'Pandas', 'Requests', 'PostgreSQL', 'Prefect', 'SMTP'],
+    '{"deliverables": ["Python ETL script", "Prefect workflow DAG", "PostgreSQL table with daily data", "Email report screenshot"], "requirements": ["Extract data from public API", "Transform with Pandas", "Load into PostgreSQL", "Orchestrate with Prefect", "Automated email reports"]}'::jsonb,
+    50,
+    2
+),
+(
+    'End-to-End Analytics Solution',
+    'Build a complete cloud-based analytics solution using BigQuery/Redshift, combining multiple data sources with advanced SQL and executive dashboards.',
+    'data_professional',
+    3,
+    ARRAY['Google BigQuery', 'PostgreSQL', 'Python', 'Advanced SQL', 'Apache Superset', 'Cloud SDK'],
+    '{"deliverables": ["Cloud-hosted dashboard", "SQL query scripts", "Final case study report"], "requirements": ["Connect multiple data sources", "Load into cloud data warehouse", "Optimized SQL queries", "Executive-level dashboard", "Business recommendations report"]}'::jsonb,
+    60,
+    3
+);
+
+-- Insert Full Stack Developer Track Projects
+INSERT INTO projects (title, description, track, project_number, tech_stack, requirements, estimated_hours, difficulty_level) VALUES
+(
+    'Responsive Portfolio Website',
+    'Build a modern, responsive portfolio website using React and Tailwind CSS, deployed on Netlify.',
+    'full_stack_dev',
+    1,
+    ARRAY['HTML5', 'CSS3', 'Tailwind CSS', 'React', 'Netlify CLI'],
+    '{"deliverables": ["Live Netlify link", "GitHub repo with React code"], "requirements": ["Hero section", "About Me section", "Projects showcase", "Contact form", "Responsive design", "Tailwind CSS styling"]}'::jsonb,
+    30,
+    1
+),
+(
+    'E-Commerce Platform',
+    'Build a full-stack e-commerce platform with product catalog, shopping cart, and Stripe payment integration.',
+    'full_stack_dev',
+    2,
+    ARRAY['React', 'Django REST Framework', 'PostgreSQL', 'Stripe', 'Pytest'],
+    '{"deliverables": ["Live e-commerce site", "GitHub repo", "Stripe sandbox integration"], "requirements": ["Product catalog", "Shopping cart", "User authentication", "Order management", "Stripe checkout", "Backend unit tests"]}'::jsonb,
+    70,
+    2
+),
+(
+    'Social Dashboard with DevOps',
+    'Create a real-time social platform with posts, comments, likes, and deploy to cloud with CI/CD pipeline.',
+    'full_stack_dev',
+    3,
+    ARRAY['React', 'Django Channels', 'PostgreSQL', 'Redis', 'Docker', 'Terraform', 'GitHub Actions', 'AWS'],
+    '{"deliverables": ["Cloud-deployed app URL", "GitHub repo with Docker/Terraform", "Demo video"], "requirements": ["Real-time notifications", "Social features (posts, comments, likes)", "Dockerized application", "Terraform infrastructure", "CI/CD pipeline", "Cloud deployment"]}'::jsonb,
+    80,
+    3
+);
+
+-- Insert Progress Checkpoints for DP Project 1
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria) 
+SELECT id, 1, 'Data Cleaning Complete', 'Clean and prepare the raw CSV dataset', '{"files": ["cleaned_data.csv"], "validation": "No null values in key columns"}'::jsonb
+FROM projects WHERE track = 'data_professional' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 2, 'Database Setup', 'Load data into PostgreSQL schema', '{"validation": "Table created with data loaded"}'::jsonb
+FROM projects WHERE track = 'data_professional' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 3, 'SQL Queries Written', 'Create complex SQL queries for analysis', '{"files": ["queries.sql"], "validation": "At least 5 queries with joins/aggregations"}'::jsonb
+FROM projects WHERE track = 'data_professional' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 4, 'Dashboard Created', 'Build Superset dashboard', '{"validation": "Dashboard accessible with at least 4 visualizations"}'::jsonb
+FROM projects WHERE track = 'data_professional' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 5, 'Report Completed', 'Write insights report', '{"files": ["insights_report.pdf"], "validation": "PDF with executive summary"}'::jsonb
+FROM projects WHERE track = 'data_professional' AND project_number = 1;
+
+-- Insert Progress Checkpoints for FSD Project 1
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 1, 'Project Setup', 'Initialize React project with Tailwind', '{"validation": "React app running locally"}'::jsonb
+FROM projects WHERE track = 'full_stack_dev' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 2, 'Hero Section', 'Create hero section with name and tagline', '{"validation": "Hero section visible and responsive"}'::jsonb
+FROM projects WHERE track = 'full_stack_dev' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 3, 'Projects Showcase', 'Add projects section with cards', '{"validation": "At least 3 project cards displayed"}'::jsonb
+FROM projects WHERE track = 'full_stack_dev' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 4, 'Contact Form', 'Implement working contact form', '{"validation": "Form submits successfully"}'::jsonb
+FROM projects WHERE track = 'full_stack_dev' AND project_number = 1;
+
+INSERT INTO progress_checkpoints (project_id, checkpoint_number, title, description, validation_criteria)
+SELECT id, 5, 'Deployed to Netlify', 'Deploy site to Netlify', '{"validation": "Live URL accessible"}'::jsonb
+FROM projects WHERE track = 'full_stack_dev' AND project_number = 1;
+
+-- Insert System Settings
+INSERT INTO system_settings (key, value, description) VALUES
+('enrollment_fee', '{"amount": 999, "currency": "USD"}'::jsonb, 'Course enrollment fee'),
+('max_students_per_trainer', '{"value": 20}'::jsonb, 'Maximum students per trainer'),
+('workspace_timeout_hours', '{"value": 8}'::jsonb, 'Auto-shutdown workspace after hours of inactivity'),
+('auto_save_interval_seconds', '{"value": 10}'::jsonb, 'Auto-save interval for workspaces'),
+('google_meet_enabled', '{"value": true}'::jsonb, 'Enable Google Meet integration'),
+('maintenance_mode', '{"value": false}'::jsonb, 'System maintenance mode');
+

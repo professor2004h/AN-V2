@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Redis for job queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: apranova-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Code-Server (Browser-based IDE) - Template
+  # This is a template for student workspaces
+  # Individual workspaces will be created dynamically
+  code-server-template:
+    image: codercom/code-server:latest
+    container_name: apranova-code-server-template
+    environment:
+      - PASSWORD=${CODE_SERVER_PASSWORD:-apranova_secure_password}
+      - SUDO_PASSWORD=${CODE_SERVER_PASSWORD:-apranova_secure_password}
+    ports:
+      - "8080:8080"
+    volumes:
+      - code-server-data:/home/coder/project
+      - code-server-config:/home/coder/.config
+    restart: unless-stopped
+    profiles:
+      - workspace
+
+  # PostgreSQL (Local development - optional, using Supabase in production)
+  postgres:
+    image: postgres:15-alpine
+    container_name: apranova-postgres
+    environment:
+      - POSTGRES_USER=apranova
+      - POSTGRES_PASSWORD=apranova_dev_password
+      - POSTGRES_DB=apranova_lms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    profiles:
+      - local-db
+
+volumes:
+  redis-data:
+  code-server-data:
+  code-server-config:
+  postgres-data:
+
+networks:
+  default:
+    name: apranova-network
+
