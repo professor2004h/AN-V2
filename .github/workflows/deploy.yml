@@ -83,37 +83,35 @@ jobs:
         TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
       run: |
         # Import existing resources to avoid "already exists" errors
-        # VPC and Networking
-        VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=apranova-lms-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
-        if [ "$VPC_ID" != "None" ] && [ ! -z "$VPC_ID" ]; then
-          terraform import 'aws_vpc.main' "$VPC_ID" 2>/dev/null || true
-          terraform import 'aws_internet_gateway.main' $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text) 2>/dev/null || true
-          
-          # Import subnets
-          SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-*" --query 'Subnets[*].SubnetId' --output text)
-          INDEX=0
-          for SUBNET_ID in $SUBNET_IDS; do
-            terraform import "aws_subnet.public[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
-            INDEX=$((INDEX+1))
-          done
-          
-          # Import private subnets
-          PRIVATE_SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-private-*" --query 'Subnets[*].SubnetId' --output text)
-          INDEX=0
-          for SUBNET_ID in $PRIVATE_SUBNET_IDS; do
-            terraform import "aws_subnet.private[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
-            INDEX=$((INDEX+1))
-          done
-          
-          # Import security groups
-          terraform import 'aws_security_group.alb' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-alb-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-          terraform import 'aws_security_group.ecs_tasks' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-ecs-tasks-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-          terraform import 'aws_security_group.redis' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-redis-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-          terraform import 'aws_security_group.efs' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-efs-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
-          
-          # Import route tables
-          terraform import 'aws_route_table.public' $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-rt" --query 'RouteTables[0].RouteTableId' --output text) 2>/dev/null || true
-        fi
+        # VPC and Networking (using the correct VPC: vpc-03c570ff139fcf5ba)
+        VPC_ID="vpc-03c570ff139fcf5ba"
+        terraform import 'aws_vpc.main' "$VPC_ID" 2>/dev/null || true
+        terraform import 'aws_internet_gateway.main' $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text) 2>/dev/null || true
+        
+        # Import subnets
+        SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-*" --query 'Subnets[*].SubnetId' --output text)
+        INDEX=0
+        for SUBNET_ID in $SUBNET_IDS; do
+          terraform import "aws_subnet.public[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
+          INDEX=$((INDEX+1))
+        done
+        
+        # Import private subnets
+        PRIVATE_SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-private-*" --query 'Subnets[*].SubnetId' --output text)
+        INDEX=0
+        for SUBNET_ID in $PRIVATE_SUBNET_IDS; do
+          terraform import "aws_subnet.private[$INDEX]" "$SUBNET_ID" 2>/dev/null || true
+          INDEX=$((INDEX+1))
+        done
+        
+        # Import security groups
+        terraform import 'aws_security_group.alb' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-alb-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+        terraform import 'aws_security_group.ecs_tasks' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-ecs-tasks-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+        terraform import 'aws_security_group.redis' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-redis-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+        terraform import 'aws_security_group.efs' $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-efs-sg" --query 'SecurityGroups[0].GroupId' --output text) 2>/dev/null || true
+        
+        # Import route tables
+        terraform import 'aws_route_table.public' $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=apranova-lms-public-rt" --query 'RouteTables[0].RouteTableId' --output text) 2>/dev/null || true
         
         # ALB and Target Groups
         ALB_ARN=$(aws elbv2 describe-load-balancers --names apranova-lms-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null)
