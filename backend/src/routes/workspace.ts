@@ -48,6 +48,39 @@ router.post('/provision', async (req: AuthRequest, res, next) => {
   }
 });
 
+// Provision workspace with real-time progress (SSE)
+router.get('/provision-stream', async (req: AuthRequest, res, next) => {
+  try {
+    let studentId = req.query.studentId as string;
+
+    // If student role, use their own ID
+    if (req.user!.role === 'student') {
+      studentId = await getStudentId(req.user!.id);
+    }
+
+    // Set up SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    // Progress callback
+    const onProgress = (message: string, progress: number) => {
+      res.write(`data: ${JSON.stringify({ message, progress })}\n\n`);
+    };
+
+    // Provision with progress updates
+    const workspace = await workspaceService.provisionWorkspace(studentId, onProgress);
+
+    // Send final success message
+    res.write(`data: ${JSON.stringify({ message: 'Complete', progress: 100, workspace })}\n\n`);
+    res.end();
+  } catch (error: any) {
+    res.write(`data: ${JSON.stringify({ error: error.message, progress: 0 })}\n\n`);
+    res.end();
+  }
+});
+
 // Get workspace (with access control)
 router.get('/:studentId', async (req: AuthRequest, res, next) => {
   try {
@@ -99,10 +132,15 @@ router.post('/:studentId/stop', async (req: AuthRequest, res, next) => {
   }
 });
 
-// Delete workspace (with access control)
+// Delete workspace (ADMIN/TRAINER ONLY - students cannot delete)
 router.delete('/:studentId', async (req: AuthRequest, res, next) => {
   try {
     const { studentId } = req.params;
+
+    // Only admins and trainers can delete workspaces
+    if (req.user!.role === 'student') {
+      return res.status(403).json({ error: 'Students cannot delete workspaces. Please contact your trainer or admin.' });
+    }
 
     const hasAccess = await verifyStudentAccess(req, studentId);
     if (!hasAccess) {

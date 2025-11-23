@@ -40,6 +40,9 @@ terraform/.terraform.lock.hcl
 # Docker
 docker/volumes/
 
+# Workspace data (runtime data, should not be committed)
+backend/workspace-data/
+
 # Logs
 logs/
 *.log

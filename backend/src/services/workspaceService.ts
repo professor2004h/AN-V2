@@ -2,13 +2,16 @@ import { supabaseAdmin } from '../lib/supabase';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { notificationService } from './notificationService';
-
-const execAsync = promisify(exec);
 import * as fs from 'fs';
 import * as path from 'path';
 
+const execAsync = promisify(exec);
+
 // Base path for workspace data - configurable via env var
 const WORKSPACE_BASE_PATH = process.env.WORKSPACE_BASE_PATH || path.join(process.cwd(), 'workspace-data');
+
+// Progress callback type for real-time updates
+export type ProgressCallback = (message: string, progress: number) => void;
 
 export class WorkspaceService {
   private readonly CODE_SERVER_IMAGE = 'codercom/code-server:latest';
@@ -16,18 +19,24 @@ export class WorkspaceService {
 
   // ==================== WORKSPACE PROVISIONING ====================
 
-  async provisionWorkspace(studentId: string) {
+  async provisionWorkspace(studentId: string, onProgress?: ProgressCallback) {
+    const sendProgress = (message: string, progress: number) => {
+      console.log(`[${progress}%] ${message}`);
+      if (onProgress) onProgress(message, progress);
+    };
+
     // Check if workspace already exists
     const existing = await this.getWorkspaceByStudentId(studentId);
 
     // If workspace exists and is running, return it
     if (existing && existing.status === 'running') {
+      sendProgress('Workspace already running', 100);
       return existing;
     }
 
     // If workspace is stuck in provisioning or error status, reset it
     if (existing && (existing.status === 'provisioning' || existing.status === 'error')) {
-      console.log(`Resetting workspace status for student ${studentId}...`);
+      sendProgress('Resetting workspace status...', 5);
       await supabaseAdmin
         .from('students')
         .update({
@@ -38,6 +47,7 @@ export class WorkspaceService {
     }
 
     // Get student details
+    sendProgress('Fetching student details...', 10);
     const { data: student, error: studentError } = await supabaseAdmin
       .from('students')
       .select('*, profile:profiles(*)')
@@ -52,6 +62,7 @@ export class WorkspaceService {
 
     try {
       // Update status to provisioning
+      sendProgress('Initializing workspace...', 15);
       await supabaseAdmin
         .from('students')
         .update({
@@ -60,51 +71,59 @@ export class WorkspaceService {
         })
         .eq('id', studentId);
 
-      // Create Docker container with pre-installed tools
       // Create workspace directory if it doesn't exist
+      sendProgress('Creating workspace directory...', 20);
       const workspacePath = path.join(WORKSPACE_BASE_PATH, studentId);
       if (!fs.existsSync(workspacePath)) {
-        console.log(`Creating workspace directory: ${workspacePath}`);
         fs.mkdirSync(workspacePath, { recursive: true });
-        // Set permissions to ensure container can write (777 is easiest for dev, but 755/chown is better for prod)
-        // In Windows, permissions are handled differently, but for bind mounts it usually works.
       }
 
-      // Create Docker container with bind mount instead of named volume
-      // Use absolute path for bind mount
-      const absoluteWorkspacePath = path.resolve(workspacePath);
-      const dockerCommand = `docker run -d --name ${containerName} -p ${port}:8080 -v "${absoluteWorkspacePath}:/home/coder/project" -e PASSWORD=apranova123 ${this.CODE_SERVER_IMAGE}`;
+      // Inject Code-Server settings for auto-save BEFORE creating container
+      sendProgress('Configuring auto-save settings...', 25);
+      await this.injectCodeServerSettings(workspacePath);
 
-      console.log(`Creating Docker container: ${containerName} on port ${port}`);
+      // Pull Docker image if not exists
+      sendProgress('Checking Docker image...', 30);
+      try {
+        await execAsync(`docker inspect ${this.CODE_SERVER_IMAGE}`);
+        sendProgress('Docker image found', 35);
+      } catch {
+        sendProgress('Pulling Docker image (this may take a few minutes)...', 35);
+        await execAsync(`docker pull ${this.CODE_SERVER_IMAGE}`);
+        sendProgress('Docker image pulled successfully', 45);
+      }
+
+      // Create Docker container with bind mount for entire /home/coder directory
+      // This ensures settings, extensions, and project files all persist
+      sendProgress('Creating Docker container...', 50);
+      const absoluteWorkspacePath = path.resolve(workspacePath);
+      const dockerCommand = `docker run -d --name ${containerName} -p ${port}:8080 -v "${absoluteWorkspacePath}:/home/coder" -e PASSWORD=apranova123 ${this.CODE_SERVER_IMAGE}`;
+
       const { stdout: containerId, stderr } = await execAsync(dockerCommand);
 
       if (stderr && !containerId) {
         throw new Error(`Docker container creation failed: ${stderr}`);
       }
 
-      console.log(`Container created: ${containerId.trim()}`);
+      sendProgress('Container created successfully', 60);
 
       // Wait for container to be ready
+      sendProgress('Starting container...', 65);
       await this.waitForContainer(containerName);
+      sendProgress('Container is running', 70);
 
-      // Install required tools in the container (optional, don't fail if this errors)
-      const installCommand = `docker exec ${containerName} sh -c "sudo apt-get update && sudo apt-get install -y python3 python3-pip nodejs npm git"`;
-
-      try {
-        console.log(`Installing tools in container ${containerName}...`);
-        await execAsync(installCommand);
-        console.log('Tools installed successfully');
-      } catch (installError) {
-        console.warn('Failed to install some tools, continuing anyway:', installError);
-      }
+      // Install required tools in the container
+      sendProgress('Installing Python 3.11...', 75);
+      await this.installTools(containerName, onProgress);
 
       // Update status to running
+      sendProgress('Finalizing workspace...', 95);
       const { data, error } = await supabaseAdmin
         .from('students')
         .update({
           workspace_status: 'running',
           workspace_url: `http://localhost:${port}`,
-          workspace_last_activity: new Date().toISOString(), // Initialize activity timestamp
+          workspace_last_activity: new Date().toISOString(),
         })
         .eq('id', studentId)
         .select()
@@ -115,8 +134,10 @@ export class WorkspaceService {
       // Notify student
       await notificationService.notifyWorkspaceStatusChange(student.user_id, 'running');
 
+      sendProgress('Workspace ready!', 100);
+
       return {
-        id: studentId,  // Add id field for API response
+        id: studentId,
         studentId,
         containerName,
         url: `http://localhost:${port}`,
@@ -124,6 +145,7 @@ export class WorkspaceService {
       };
     } catch (error: any) {
       console.error(`Workspace provisioning error for student ${studentId}:`, error);
+      sendProgress(`Error: ${error.message}`, 0);
 
       // Update status to error
       await supabaseAdmin
@@ -154,6 +176,65 @@ export class WorkspaceService {
     }
   }
 
+  // ==================== AUTO-SAVE CONFIGURATION ====================
+
+  private async injectCodeServerSettings(workspacePath: string) {
+    const settingsDir = path.join(workspacePath, '.local', 'share', 'code-server', 'User');
+    const settingsFile = path.join(settingsDir, 'settings.json');
+
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(settingsDir)) {
+      fs.mkdirSync(settingsDir, { recursive: true });
+    }
+
+    // Code-Server settings with auto-save enabled
+    const settings = {
+      "files.autoSave": "afterDelay",
+      "files.autoSaveDelay": 1000, // 1 second after typing stops
+      "editor.formatOnSave": true,
+      "editor.formatOnPaste": true,
+      "workbench.startupEditor": "none",
+      "workbench.colorTheme": "Default Dark+",
+      "terminal.integrated.defaultProfile.linux": "bash"
+    };
+
+    // Write settings file
+    fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+    console.log(`Auto-save settings injected at: ${settingsFile}`);
+  }
+
+  // ==================== TOOL INSTALLATION ====================
+
+  private async installTools(containerName: string, onProgress?: ProgressCallback) {
+    const sendProgress = (message: string, progress: number) => {
+      console.log(`[${progress}%] ${message}`);
+      if (onProgress) onProgress(message, progress);
+    };
+
+    try {
+      // Update package list
+      sendProgress('Updating package list...', 76);
+      await execAsync(`docker exec ${containerName} sh -c "sudo apt-get update -qq"`);
+
+      // Install Python 3.11
+      sendProgress('Installing Python 3.11...', 80);
+      await execAsync(`docker exec ${containerName} sh -c "sudo apt-get install -y -qq python3 python3-pip"`);
+
+      // Install Node.js 20
+      sendProgress('Installing Node.js 20...', 85);
+      await execAsync(`docker exec ${containerName} sh -c "sudo apt-get install -y -qq nodejs npm"`);
+
+      // Install Git and development tools
+      sendProgress('Installing Git and development tools...', 90);
+      await execAsync(`docker exec ${containerName} sh -c "sudo apt-get install -y -qq git curl wget"`);
+
+      sendProgress('All tools installed successfully', 93);
+    } catch (installError) {
+      console.warn('Failed to install some tools, continuing anyway:', installError);
+      sendProgress('Warning: Some tools may not be installed', 93);
+    }
+  }
+
   // ==================== WORKSPACE MANAGEMENT ====================
 
   async getWorkspaceByStudentId(studentId: string) {
@@ -166,7 +247,7 @@ export class WorkspaceService {
     if (error) throw error;
 
     return {
-      id: data.id,  // Add id field for API response
+      id: data.id,
       studentId: data.id,
       url: data.workspace_url,
       status: data.workspace_status,
@@ -181,7 +262,10 @@ export class WorkspaceService {
 
       const { data, error } = await supabaseAdmin
         .from('students')
-        .update({ workspace_status: 'running' })
+        .update({
+          workspace_status: 'running',
+          workspace_last_activity: new Date().toISOString()
+        })
         .eq('id', studentId)
         .select()
         .single();
@@ -226,7 +310,6 @@ export class WorkspaceService {
       await execAsync(`docker stop ${containerName} || true`);
       await execAsync(`docker rm ${containerName} || true`);
       // Do NOT remove the data directory (bind mount) to ensure persistence
-      // await execAsync(`docker volume rm ${containerName}-data || true`);
 
       const { data, error } = await supabaseAdmin
         .from('students')
@@ -260,14 +343,13 @@ export class WorkspaceService {
     while (Date.now() - startTime < maxWait) {
       try {
         const { stdout } = await execAsync(`docker inspect -f '{{.State.Running}}' ${containerName}`);
-        console.log(`Inspect ${containerName}: ${stdout.trim()}`);
         const isRunning = stdout.trim().replace(/'/g, '') === 'true';
         if (isRunning) {
           console.log(`Container ${containerName} is running!`);
           return;
         }
       } catch (error) {
-        console.log(`Inspect failed: ${error}`);
+        // Container not ready yet
       }
 
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -315,15 +397,7 @@ export class WorkspaceService {
       for (const student of inactiveStudents) {
         console.log(`Stopping inactive workspace for student ${student.id}...`);
         try {
-          const containerName = `codeserver-${student.id.substring(0, 8)}`;
-          await execAsync(`docker stop ${containerName} || true`);
-          await execAsync(`docker rm ${containerName} || true`);
-
-          await supabaseAdmin
-            .from('students')
-            .update({ workspace_status: 'stopped' })
-            .eq('id', student.id);
-
+          await this.stopWorkspace(student.id);
         } catch (err) {
           console.error(`Failed to cleanup workspace for student ${student.id}:`, err);
         }

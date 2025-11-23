@@ -1,18 +1,23 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentApi, workspaceApi } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/shared/loading-spinner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Code, Play, Square, Trash2, ExternalLink, AlertCircle } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { Code, Play, Square, ExternalLink, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function WorkspacePage() {
   const queryClient = useQueryClient()
+  const [provisioningProgress, setProvisioningProgress] = useState(0)
+  const [provisioningMessage, setProvisioningMessage] = useState('')
+  const [isProvisioning, setIsProvisioning] = useState(false)
 
   const { data: student } = useQuery({
     queryKey: ['student', 'me'],
@@ -32,19 +37,82 @@ export default function WorkspacePage() {
     enabled: !!student?.id,
   })
 
-  const provisionMutation = useMutation({
-    mutationFn: async () => {
-      const response = await workspaceApi.provision()
-      return response.data
-    },
-    onSuccess: () => {
-      toast.success('Workspace provisioned successfully!')
-      queryClient.invalidateQueries({ queryKey: ['workspace'] })
-    },
-    onError: () => {
-      toast.error('Failed to provision workspace')
-    },
-  })
+  // Real-time provisioning with SSE using fetch (supports auth headers)
+  const handleProvisionWithProgress = async () => {
+    setIsProvisioning(true)
+    setProvisioningProgress(0)
+    setProvisioningMessage('Starting provisioning...')
+
+    try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        toast.error('Authentication required')
+        setIsProvisioning(false)
+        return
+      }
+
+      // Use fetch for SSE with auth headers
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api/workspaces/provision-stream`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Accept': 'text/event-stream',
+          },
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to start provisioning')
+      }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6))
+
+            if (data.error) {
+              toast.error(data.error)
+              setIsProvisioning(false)
+              return
+            }
+
+            if (data.progress !== undefined) {
+              setProvisioningProgress(data.progress)
+              setProvisioningMessage(data.message)
+            }
+
+            if (data.progress === 100) {
+              toast.success('Workspace provisioned successfully!')
+              setIsProvisioning(false)
+              queryClient.invalidateQueries({ queryKey: ['workspace'] })
+              return
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Provisioning error:', error)
+      toast.error(error.message || 'Failed to provision workspace')
+      setIsProvisioning(false)
+    }
+  }
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -64,17 +132,6 @@ export default function WorkspacePage() {
     },
     onSuccess: () => {
       toast.success('Workspace stopped')
-      queryClient.invalidateQueries({ queryKey: ['workspace'] })
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const response = await workspaceApi.deleteWorkspace(student!.id)
-      return response.data
-    },
-    onSuccess: () => {
-      toast.success('Workspace deleted')
       queryClient.invalidateQueries({ queryKey: ['workspace'] })
     },
   })
@@ -100,6 +157,23 @@ export default function WorkspacePage() {
     return () => clearInterval(interval)
   }, [workspace?.status])
 
+  // Auto-stop detection when user closes tab or logs out
+  useEffect(() => {
+    if (workspace?.status !== 'running') return
+
+    const handleBeforeUnload = async () => {
+      // Send one last heartbeat update before closing
+      try {
+        await workspaceApi.heartbeat()
+      } catch (error) {
+        console.error('Failed to send final heartbeat:', error)
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [workspace?.status])
+
   if (isLoading) {
     return <LoadingSpinner />
   }
@@ -112,6 +186,15 @@ export default function WorkspacePage() {
       error: 'destructive',
     }
     return variants[status] || 'default'
+  }
+
+  const estimateTimeRemaining = (progress: number) => {
+    if (progress === 0) return '3-4 minutes'
+    if (progress < 30) return '3-4 minutes'
+    if (progress < 50) return '2-3 minutes'
+    if (progress < 75) return '1-2 minutes'
+    if (progress < 95) return 'Less than 1 minute'
+    return 'Almost done...'
   }
 
   return (
@@ -129,7 +212,7 @@ export default function WorkspacePage() {
             <div>
               <CardTitle>Code-Server Workspace</CardTitle>
               <CardDescription>
-                VS Code in your browser with all tools pre-installed
+                VS Code in your browser with auto-save enabled
               </CardDescription>
             </div>
             {workspace?.status && (
@@ -146,15 +229,39 @@ export default function WorkspacePage() {
                 <Code className="h-4 w-4" />
                 <AlertDescription>
                   You don't have a workspace yet. Click below to provision your personal development environment.
+                  <br />
+                  <span className="text-xs text-muted-foreground mt-1 block">
+                    First-time provisioning takes 3-4 minutes. Subsequent access is instant!
+                  </span>
                 </AlertDescription>
               </Alert>
-              <Button
-                onClick={() => provisionMutation.mutate()}
-                disabled={provisionMutation.isPending}
-                className="w-full"
-              >
-                {provisionMutation.isPending ? 'Provisioning...' : 'Provision Workspace'}
-              </Button>
+
+              {isProvisioning ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{provisioningMessage}</span>
+                      <span className="text-muted-foreground">{provisioningProgress}%</span>
+                    </div>
+                    <Progress value={provisioningProgress} className="h-2" />
+                    <p className="text-xs text-muted-foreground">
+                      Estimated time remaining: {estimateTimeRemaining(provisioningProgress)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Please wait while we set up your workspace...</span>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleProvisionWithProgress}
+                  disabled={isProvisioning}
+                  className="w-full"
+                >
+                  Provision Workspace
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -179,7 +286,7 @@ export default function WorkspacePage() {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    There was an error with your workspace. Please try deleting and provisioning again.
+                    There was an error with your workspace. Please contact your trainer or admin for assistance.
                   </AlertDescription>
                 </Alert>
               )}
@@ -191,7 +298,7 @@ export default function WorkspacePage() {
                     disabled={startMutation.isPending}
                   >
                     <Play className="h-4 w-4 mr-2" />
-                    Start Workspace
+                    {startMutation.isPending ? 'Starting...' : 'Start Workspace'}
                   </Button>
                 )}
                 {workspace.status === 'running' && (
@@ -204,30 +311,27 @@ export default function WorkspacePage() {
                     Stop Workspace
                   </Button>
                 )}
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    if (confirm('Are you sure you want to delete your workspace? This cannot be undone.')) {
-                      deleteMutation.mutate()
-                    }
-                  }}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Workspace
-                </Button>
               </div>
+
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <strong>Auto-save is enabled!</strong> Your files are automatically saved 1 second after you stop typing.
+                  <br />
+                  <strong>Auto-stop:</strong> Your workspace will automatically stop after 15 minutes of inactivity to save resources.
+                </AlertDescription>
+              </Alert>
             </>
           )}
 
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <p className="text-sm font-medium">Pre-installed Tools:</p>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• Python 3 + Data Science libraries (pandas, numpy, matplotlib, jupyter)</li>
-              <li>• Node.js + React, Next.js, NestJS</li>
-              <li>• PostgreSQL client</li>
-              <li>• Git + GitHub CLI</li>
-              <li>• VS Code extensions (Python, ESLint, Prettier, Tailwind, Docker)</li>
+              <li>• Python 3.11 + pip</li>
+              <li>• Node.js 20 + npm</li>
+              <li>• Git version control</li>
+              <li>• Auto-save enabled (1 second delay)</li>
+              <li>• Dark theme by default</li>
             </ul>
           </div>
         </CardContent>
@@ -235,4 +339,3 @@ export default function WorkspacePage() {
     </div>
   )
 }
-
