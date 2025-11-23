@@ -71,6 +71,16 @@ jobs:
     - name: Import Existing Resources
       working-directory: ./terraform
       continue-on-error: true
+      env:
+        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
       run: |
         # Import existing resources to avoid "already exists" errors
         terraform import 'aws_lb.main' $(aws elbv2 describe-load-balancers --names apranova-lms-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text) 2>/dev/null || true
