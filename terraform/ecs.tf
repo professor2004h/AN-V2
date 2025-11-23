@@ -25,6 +25,12 @@ resource "aws_launch_template" "backend" {
   user_data = base64encode(<<-EOF
               #!/bin/bash
               echo ECS_CLUSTER=${aws_ecs_cluster.main.name} >> /etc/ecs/ecs.config
+              
+              # Install EFS utils and mount EFS
+              yum install -y amazon-efs-utils
+              mkdir -p /workspace-data
+              mount -t efs -o tls ${aws_efs_file_system.main.id}:/ /workspace-data
+              echo "${aws_efs_file_system.main.id}:/ /workspace-data efs _netdev,tls 0 0" >> /etc/fstab
               EOF
   )
 
@@ -182,13 +188,9 @@ resource "aws_ecs_task_definition" "backend" {
 
   volume {
     name = "workspace_data"
-    efs_volume_configuration {
-      file_system_id = aws_efs_file_system.main.id
-      root_directory = "/"
-    }
+    host_path = "/workspace-data"
   }
 }
-
 # --- Services ---
 
 resource "aws_ecs_service" "frontend" {
