@@ -38,6 +38,88 @@ jobs:
       working-directory: ./terraform
       run: terraform init
 
+    - name: Import Existing Resources (if needed)
+      working-directory: ./terraform
+      env:
+        TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+        TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+        TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+        TF_VAR_code_server_password: ${{ secrets.CODE_SERVER_PASSWORD }}
+      run: |
+        echo "Checking for existing resources to import..."
+        
+        # Function to safely import (ignores if already in state)
+        safe_import() {
+          resource=$1
+          id=$2
+          if ! terraform state show "$resource" &>/dev/null; then
+            echo "Importing $resource..."
+            terraform import "$resource" "$id" || echo "Import failed or resource doesn't exist, continuing..."
+          else
+            echo "$resource already in state, skipping..."
+          fi
+        }
+        
+        # Import ECR repositories
+        safe_import "aws_ecr_repository.frontend" "apranova-lms-frontend"
+        safe_import "aws_ecr_repository.backend" "apranova-lms-backend"
+        
+        # Import VPC and networking
+        VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=apranova-lms-vpc" --query "Vpcs[0].VpcId" --output text 2>/dev/null || echo "")
+        if [ ! -z "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+          safe_import "aws_vpc.main" "$VPC_ID"
+        fi
+        
+        # Import subnets
+        SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].SubnetId" --output text 2>/dev/null || echo "")
+        if [ ! -z "$SUBNET_IDS" ]; then
+          SUBNET_ARRAY=($SUBNET_IDS)
+          [ ${#SUBNET_ARRAY[@]} -gt 0 ] && safe_import "aws_subnet.public[0]" "${SUBNET_ARRAY[0]}"
+          [ ${#SUBNET_ARRAY[@]} -gt 1 ] && safe_import "aws_subnet.public[1]" "${SUBNET_ARRAY[1]}"
+        fi
+        
+        # Import Internet Gateway
+        IGW_ID=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query "InternetGateways[0].InternetGatewayId" --output text 2>/dev/null || echo "")
+        [ ! -z "$IGW_ID" ] && [ "$IGW_ID" != "None" ] && safe_import "aws_internet_gateway.main" "$IGW_ID"
+        
+        # Import Security Groups
+        ALB_SG=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=apranova-lms-alb-sg" --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "")
+        [ ! -z "$ALB_SG" ] && [ "$ALB_SG" != "None" ] && safe_import "aws_security_group.alb" "$ALB_SG"
+        
+        # Import EFS
+        EFS_ID=$(aws efs describe-file-systems --query "FileSystems[?CreationToken=='apranova-lms-efs'].FileSystemId | [0]" --output text 2>/dev/null || echo "")
+        [ ! -z "$EFS_ID" ] && [ "$EFS_ID" != "None" ] && safe_import "aws_efs_file_system.main" "$EFS_ID"
+        
+        # Import IAM roles
+        safe_import "aws_iam_role.ecs_execution_role" "apranova-lms-ecs-execution-role"
+        safe_import "aws_iam_role.ecs_task_role" "apranova-lms-ecs-task-role"
+        safe_import "aws_iam_role.ecs_instance_role" "apranova-lms-ecs-instance-role"
+        safe_import "aws_iam_policy.ecs_task_policy" "arn:aws:iam::183037996720:policy/apranova-lms-ecs-task-policy"
+        safe_import "aws_iam_instance_profile.ecs_instance_profile" "apranova-lms-ecs-instance-profile"
+        
+        # Import ECS cluster
+        safe_import "aws_ecs_cluster.main" "apranova-lms-cluster"
+        
+        # Import ElastiCache subnet group
+        safe_import "aws_elasticache_subnet_group.main" "apranova-lms-redis-subnet-group"
+        
+        # Import Auto Scaling Group
+        safe_import "aws_autoscaling_group.backend" "apranova-lms-backend-asg"
+        
+        # Import Target Groups
+        FRONTEND_TG=$(aws elbv2 describe-target-groups --names apranova-lms-frontend-tg --query "TargetGroups[0].TargetGroupArn" --output text 2>/dev/null || echo "")
+        [ ! -z "$FRONTEND_TG" ] && [ "$FRONTEND_TG" != "None" ] && safe_import "aws_lb_target_group.frontend" "$FRONTEND_TG"
+        
+        BACKEND_TG=$(aws elbv2 describe-target-groups --names apranova-lms-backend-tg --query "TargetGroups[0].TargetGroupArn" --output text 2>/dev/null || echo "")
+        [ ! -z "$BACKEND_TG" ] && [ "$BACKEND_TG" != "None" ] && safe_import "aws_lb_target_group.backend" "$BACKEND_TG"
+        
+        echo "Import check complete!"
+
     - name: Terraform Plan
       working-directory: ./terraform
       env:
