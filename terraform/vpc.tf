@@ -6,6 +6,11 @@ resource "aws_vpc" "main" {
   tags = {
     Name = "${var.app_name}-vpc"
   }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [tags]
+  }
 }
 
 resource "aws_internet_gateway" "main" {
@@ -13,6 +18,11 @@ resource "aws_internet_gateway" "main" {
 
   tags = {
     Name = "${var.app_name}-igw"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [tags]
   }
 }
 
@@ -25,6 +35,11 @@ resource "aws_subnet" "public" {
 
   tags = {
     Name = "${var.app_name}-public-${count.index + 1}"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [tags]
   }
 }
 
