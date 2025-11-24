@@ -29,7 +29,7 @@ resource "aws_lb_target_group" "backend" {
   port        = 3001
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
-  target_type = "instance" # EC2 uses instance (or IP with awsvpc mode) - using instance for simplicity with bridge network
+  target_type = "ip" # Changed to match existing resource
 
   health_check {
     path                = "/health" # Ensure backend has this endpoint
