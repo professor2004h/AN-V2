@@ -75,12 +75,16 @@ jobs:
           safe_import "aws_vpc.main" "$VPC_ID"
         fi
         
-        # Import subnets
-        SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].SubnetId" --output text 2>/dev/null || echo "")
+        # Import subnets - smarter logic checking CIDR
+        SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query "Subnets[*].{ID:SubnetId,CIDR:CidrBlock}" --output text 2>/dev/null || echo "")
         if [ ! -z "$SUBNET_IDS" ]; then
-          SUBNET_ARRAY=($SUBNET_IDS)
-          [ ${#SUBNET_ARRAY[@]} -gt 0 ] && safe_import "aws_subnet.public[0]" "${SUBNET_ARRAY[0]}"
-          [ ${#SUBNET_ARRAY[@]} -gt 1 ] && safe_import "aws_subnet.public[1]" "${SUBNET_ARRAY[1]}"
+          echo "$SUBNET_IDS" | while read -r ID CIDR; do
+            if [ "$CIDR" == "10.0.1.0/24" ]; then
+              safe_import "aws_subnet.public[0]" "$ID"
+            elif [ "$CIDR" == "10.0.2.0/24" ]; then
+              safe_import "aws_subnet.public[1]" "$ID"
+            fi
+          done
         fi
         
         # Import Internet Gateway
