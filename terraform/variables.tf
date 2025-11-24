@@ -37,7 +37,7 @@ variable "container_port_backend" {
 }
 
 variable "ec2_instance_type" {
-  default = "t3.medium"
+  default = "t3.micro"
 }
 
 # Secrets (passed via TF_VAR_...)
