@@ -75,6 +75,17 @@ variable "supabase_service_role_key" {
   sensitive   = true
 }
 
+variable "stripe_secret_key" {
+  description = "Stripe Secret Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "stripe_publishable_key" {
+  description = "Stripe Publishable Key"
+  type        = string
+}
+
 # Code Server Dynamic Resource Allocation
 variable "code_server_initial_cpu" {
   description = "Initial CPU for code-server (in vCPU units)"

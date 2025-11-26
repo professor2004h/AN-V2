@@ -104,6 +104,14 @@ resource "aws_ecs_task_definition" "backend" {
         value = var.supabase_service_role_key
       },
       {
+        name  = "STRIPE_SECRET_KEY"
+        value = var.stripe_secret_key
+      },
+      {
+        name  = "STRIPE_PUBLISHABLE_KEY"
+        value = var.stripe_publishable_key
+      },
+      {
         name  = "ECS_CLUSTER_NAME"
         value = aws_ecs_cluster.main.name
       },

@@ -61,6 +61,8 @@ jobs:
         TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
         TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
         TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
       run: terraform plan -out=tfplan
 
     - name: Terraform Apply
@@ -69,6 +71,8 @@ jobs:
         TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
         TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
         TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+        TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
       run: terraform apply -auto-approve tfplan
 
     - name: Get Terraform Outputs
