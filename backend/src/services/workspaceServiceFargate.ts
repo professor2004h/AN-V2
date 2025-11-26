@@ -75,7 +75,7 @@ export class WorkspaceService {
                     awsvpcConfiguration: {
                         subnets: this.SUBNETS,
                         securityGroups: [this.SECURITY_GROUP],
-                        assignPublicIp: 'DISABLED',
+                        assignPublicIp: 'ENABLED',
                     },
                 },
                 overrides: {
@@ -146,17 +146,41 @@ export class WorkspaceService {
                 throw new Error('Failed to get task details');
             }
 
-            // Extract private IP from network interface
+            // Extract public IP from network interface
             const networkInterface = runningTask.attachments?.[0]?.details?.find(
-                (detail: any) => detail.name === 'privateIPv4Address'
+                (detail: any) => detail.name === 'networkInterfaceId'
             );
-            const privateIp = networkInterface?.value;
+            const eniId = networkInterface?.value;
 
-            if (!privateIp) {
+            if (!eniId) {
+                throw new Error('Failed to get network interface ID');
+            }
+
+            // Get public IP from ENI
+            // Note: For Fargate tasks with public IP, we need to query the ENI
+            // For now, we'll use a different approach - get it from task metadata
+            let publicIp: string | undefined;
+
+            // Try to get public IP from attachments
+            const publicIpDetail = runningTask.attachments?.[0]?.details?.find(
+                (detail: any) => detail.name === 'publicIPv4Address'
+            );
+
+            if (publicIpDetail?.value) {
+                publicIp = publicIpDetail.value;
+            } else {
+                // Fallback: use private IP (will work if accessing from within VPC)
+                const privateIpDetail = runningTask.attachments?.[0]?.details?.find(
+                    (detail: any) => detail.name === 'privateIPv4Address'
+                );
+                publicIp = privateIpDetail?.value;
+            }
+
+            if (!publicIp) {
                 throw new Error('Failed to get task IP address');
             }
 
-            const workspaceUrl = `http://${privateIp}:8080`;
+            const workspaceUrl = `http://${publicIp}:8080`;
 
             // Update status to running
             sendProgress('Finalizing workspace...', 95);

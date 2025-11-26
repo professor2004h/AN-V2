@@ -125,7 +125,7 @@ resource "aws_ecs_task_definition" "backend" {
       },
       {
         name  = "CODE_SERVER_SUBNETS"
-        value = join(",", aws_subnet.private[*].id)
+        value = join(",", aws_subnet.public[*].id)
       },
       {
         name  = "CODE_SERVER_SECURITY_GROUP"
