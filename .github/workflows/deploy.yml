@@ -115,7 +115,7 @@ jobs:
         docker build \
           --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
           --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-          --build-arg NEXT_PUBLIC_BACKEND_URL=http://${ALB_DNS}:3001 \
+          --build-arg NEXT_PUBLIC_BACKEND_URL=http://${ALB_DNS} \
           --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }} \
           -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG \
           -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest .
