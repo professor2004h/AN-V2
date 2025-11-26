@@ -74,7 +74,9 @@ jobs:
       id: terraform_output
       working-directory: ./terraform
       run: |
-        ALB_DNS=$(terraform output -json alb_dns_name | jq -r '.')
+        terraform output -json > output.json
+        cat output.json
+        ALB_DNS=$(jq -r '.alb_dns_name.value' output.json)
         echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
 
   build-and-deploy:
