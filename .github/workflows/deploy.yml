@@ -39,6 +39,13 @@ jobs:
       with:
         terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+    - name: Build Lambda Function
+      working-directory: ./terraform/lambda/resource-optimizer
+      run: |
+        npm install
+        zip -r ../resource-optimizer.zip .
+        ls -la ../resource-optimizer.zip
+
     - name: Terraform Init
       working-directory: ./terraform
       run: terraform init
