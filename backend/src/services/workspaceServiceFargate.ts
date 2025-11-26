@@ -132,7 +132,7 @@ export class WorkspaceService {
 
             // Wait for task to be running
             sendProgress('Waiting for container to start...', 60);
-            await this.waitForTaskRunning(taskArn);
+            await this.waitForTaskRunning(taskArn, 300000, (msg) => sendProgress(msg, 65)); // 5 mins max wait
             sendProgress('Container is running', 70);
 
             // Get task details to extract network interface
@@ -323,7 +323,7 @@ export class WorkspaceService {
 
     // ==================== HELPER METHODS ====================
 
-    private async waitForTaskRunning(taskArn: string, maxWait = 120000): Promise<void> {
+    private async waitForTaskRunning(taskArn: string, maxWait = 300000, onProgress?: (msg: string) => void): Promise<void> {
         console.log(`Waiting for task ${taskArn} to be running...`);
         const startTime = Date.now();
 
@@ -347,6 +347,9 @@ export class WorkspaceService {
                 console.error('Error checking task status:', error);
             }
 
+            if (onProgress) {
+                onProgress(`Waiting for container to start... (${Math.round((Date.now() - startTime) / 1000)}s)`);
+            }
             await new Promise(resolve => setTimeout(resolve, 5000)); // Check every 5 seconds
         }
 
