@@ -1,0 +1,13 @@
+{
+    "name": "code-server-resource-optimizer",
+    "version": "1.0.0",
+    "description": "Dynamic resource allocation for code-server workspaces",
+    "main": "index.js",
+    "scripts": {
+        "build": "npm install && zip -r ../resource-optimizer.zip ."
+    },
+    "dependencies": {
+        "@aws-sdk/client-ecs": "^3.450.0",
+        "@aws-sdk/client-cloudwatch": "^3.450.0"
+    }
+}

@@ -1,0 +1,51 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - heading "Apranova LMS" [level=1] [ref=e6]
+          - generic [ref=e7]: Student
+        - generic [ref=e8]:
+          - button [ref=e9] [cursor=pointer]:
+            - img [ref=e10]
+          - button "Toggle theme" [ref=e13] [cursor=pointer]:
+            - img [ref=e14]
+            - img
+            - generic [ref=e20]: Toggle theme
+          - button "CD" [ref=e21] [cursor=pointer]:
+            - generic [ref=e23]: CD
+    - generic [ref=e24]:
+      - complementary [ref=e25]:
+        - navigation [ref=e27]:
+          - link "Overview" [ref=e28] [cursor=pointer]:
+            - /url: /student
+            - img [ref=e29]
+            - text: Overview
+          - link "Projects" [ref=e34] [cursor=pointer]:
+            - /url: /student/projects
+            - img [ref=e35]
+            - text: Projects
+          - link "Tasks" [ref=e37] [cursor=pointer]:
+            - /url: /student/tasks
+            - img [ref=e38]
+            - text: Tasks
+          - link "Workspace" [ref=e41] [cursor=pointer]:
+            - /url: /student/workspace
+            - img [ref=e42]
+            - text: Workspace
+          - link "Messages" [ref=e45] [cursor=pointer]:
+            - /url: /student/messages
+            - img [ref=e46]
+            - text: Messages
+          - link "Settings" [ref=e48] [cursor=pointer]:
+            - /url: /student/settings
+            - img [ref=e49]
+            - text: Settings
+      - main [ref=e52]:
+        - img [ref=e55]
+  - region "Notifications alt+T"
+  - alert [ref=e57]
+```

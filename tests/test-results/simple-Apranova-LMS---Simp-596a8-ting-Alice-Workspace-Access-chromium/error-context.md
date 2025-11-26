@@ -1,0 +1,105 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - heading "Apranova LMS" [level=1] [ref=e6]
+          - generic [ref=e7]: Student
+        - generic [ref=e8]:
+          - button "1" [ref=e9] [cursor=pointer]:
+            - img [ref=e10]
+            - generic [ref=e13]: "1"
+          - button "Toggle theme" [ref=e14] [cursor=pointer]:
+            - img [ref=e15]
+            - img
+            - generic [ref=e21]: Toggle theme
+          - button "AJ" [ref=e22] [cursor=pointer]:
+            - generic [ref=e24]: AJ
+    - generic [ref=e25]:
+      - complementary [ref=e26]:
+        - navigation [ref=e28]:
+          - link "Overview" [ref=e29] [cursor=pointer]:
+            - /url: /student
+            - img [ref=e30]
+            - text: Overview
+          - link "Projects" [ref=e35] [cursor=pointer]:
+            - /url: /student/projects
+            - img [ref=e36]
+            - text: Projects
+          - link "Tasks" [ref=e38] [cursor=pointer]:
+            - /url: /student/tasks
+            - img [ref=e39]
+            - text: Tasks
+          - link "Workspace" [ref=e42] [cursor=pointer]:
+            - /url: /student/workspace
+            - img [ref=e43]
+            - text: Workspace
+          - link "Messages" [ref=e46] [cursor=pointer]:
+            - /url: /student/messages
+            - img [ref=e47]
+            - text: Messages
+          - link "Settings" [ref=e49] [cursor=pointer]:
+            - /url: /student/settings
+            - img [ref=e50]
+            - text: Settings
+      - main [ref=e53]:
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - heading "Welcome back, Alice!" [level=1] [ref=e57]
+            - paragraph [ref=e58]: Here's your learning progress overview
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - generic [ref=e61]:
+                - heading "Overall Progress" [level=3] [ref=e62]
+                - img [ref=e63]
+              - generic [ref=e66]:
+                - generic [ref=e67]: 0%
+                - paragraph [ref=e68]: Across all projects
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - heading "Completed Projects" [level=3] [ref=e71]
+                - img [ref=e72]
+              - generic [ref=e74]:
+                - generic [ref=e75]: "0"
+                - paragraph [ref=e76]: Out of 0 total
+            - generic [ref=e77]:
+              - generic [ref=e78]:
+                - heading "Pending Tasks" [level=3] [ref=e79]
+                - img [ref=e80]
+              - generic [ref=e83]:
+                - generic [ref=e84]: "1"
+                - paragraph [ref=e85]: Tasks to complete
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - heading "Time Spent" [level=3] [ref=e88]
+                - img [ref=e89]
+              - generic [ref=e92]:
+                - generic [ref=e93]: "0"
+                - paragraph [ref=e94]: Hours of learning
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - heading "Recent Tasks" [level=3] [ref=e98]
+                - paragraph [ref=e99]: Your latest assignments
+              - generic [ref=e101]:
+                - generic [ref=e102]:
+                  - generic [ref=e103]:
+                    - paragraph [ref=e104]: Alice's Special Project
+                    - paragraph [ref=e105]: "Due: Dec 1, 2025"
+                  - generic [ref=e106]: pending
+                - button "View All Tasks" [ref=e107] [cursor=pointer]:
+                  - link "View All Tasks" [ref=e108]:
+                    - /url: /student/tasks
+            - generic [ref=e109]:
+              - generic [ref=e110]:
+                - heading "Recent Notifications" [level=3] [ref=e111]
+                - paragraph [ref=e112]: Latest updates
+              - generic [ref=e115]:
+                - paragraph [ref=e116]: Workspace Status Update
+                - paragraph [ref=e117]: Your workspace is now running and ready to use.
+  - region "Notifications alt+T"
+  - alert [ref=e118]
+```

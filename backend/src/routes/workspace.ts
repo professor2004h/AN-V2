@@ -38,7 +38,20 @@ router.post('/provision', async (req: AuthRequest, res, next) => {
 
     // If student role, use their own ID
     if (req.user!.role === 'student') {
-      studentId = await getStudentId(req.user!.id);
+      try {
+        studentId = await getStudentId(req.user!.id);
+        console.log(`Student ID for user ${req.user!.id}: ${studentId}`);
+      } catch (error: any) {
+        console.error(`Failed to get student ID for user ${req.user!.id}:`, error);
+        return res.status(404).json({
+          error: 'Student record not found. Please contact your administrator.',
+          details: error.message
+        });
+      }
+    }
+
+    if (!studentId) {
+      return res.status(400).json({ error: 'Student ID is required' });
     }
 
     const workspace = await workspaceService.provisionWorkspace(studentId);

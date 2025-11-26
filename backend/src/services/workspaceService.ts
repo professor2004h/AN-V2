@@ -93,6 +93,58 @@ export class WorkspaceService {
         sendProgress('Docker image pulled successfully', 45);
       }
 
+      // Check if container already exists (stopped or running)
+      sendProgress('Checking for existing container...', 45);
+      let containerExists = false;
+      try {
+        await execAsync(`docker inspect ${containerName}`);
+        containerExists = true;
+        sendProgress('Found existing container', 48);
+      } catch {
+        // Container doesn't exist, which is fine
+      }
+
+      // If container exists but is stopped, try to start it
+      if (containerExists) {
+        try {
+          sendProgress('Starting existing container...', 50);
+          await execAsync(`docker start ${containerName}`);
+          sendProgress('Container started successfully', 70);
+          
+          // Update status to running
+          sendProgress('Finalizing workspace...', 95);
+          const { data, error } = await supabaseAdmin
+            .from('students')
+            .update({
+              workspace_status: 'running',
+              workspace_url: `http://localhost:${port}`,
+              workspace_last_activity: new Date().toISOString(),
+            })
+            .eq('id', studentId)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          // Notify student
+          await notificationService.notifyWorkspaceStatusChange(student.user_id, 'running');
+
+          sendProgress('Workspace ready!', 100);
+
+          return {
+            id: studentId,
+            studentId,
+            containerName,
+            url: `http://localhost:${port}`,
+            status: 'running',
+          };
+        } catch (startError) {
+          // If starting fails, remove the old container and create a new one
+          sendProgress('Removing old container...', 48);
+          await execAsync(`docker rm -f ${containerName} || true`);
+        }
+      }
+
       // Create Docker container with bind mount for entire /home/coder directory
       // This ensures settings, extensions, and project files all persist
       sendProgress('Creating Docker container...', 50);

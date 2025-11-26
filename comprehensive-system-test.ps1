@@ -414,7 +414,8 @@ if ($aliceLogin.Success) {
         -headers @{ Authorization = "Bearer $aliceToken" }
     
     if ($aliceProfile.Success) {
-        Write-TestResult "View Alice's profile" $true "Profile loaded"
+        $aliceStudentId = $aliceProfile.Data.id
+        Write-TestResult "View Alice's profile" $true "Profile loaded (ID: $aliceStudentId)"
     }
     else {
         Write-TestResult "View Alice's profile" $false $aliceProfile.Error
@@ -427,6 +428,18 @@ if ($aliceLogin.Success) {
     if ($aliceTasks.Success) {
         $count = if ($aliceTasks.Data.Count) { $aliceTasks.Data.Count } else { $aliceTasks.Data.Length }
         Write-TestResult "View Alice's tasks" $true "Found $count tasks"
+        
+        # Verify data isolation - All tasks should belong to Alice
+        $otherStudentTasks = $aliceTasks.Data | Where-Object { $_.student_id -ne $aliceStudentId }
+        
+        if ($otherStudentTasks.Count -eq 0) {
+            Write-TestResult "Data isolation (Alice's tasks)" $true "Alice can only see her own tasks"
+        }
+        else {
+            Write-Host "DEBUG: Alice Student ID: $aliceStudentId" -ForegroundColor Yellow
+            $aliceTasks.Data | ForEach-Object { Write-Host "Task Student ID: $($_.student_id)" -ForegroundColor Yellow }
+            Write-TestResult "Data isolation (Alice's tasks)" $false "Alice can see tasks from other students"
+        }
     }
     else {
         Write-TestResult "View Alice's tasks" $false $aliceTasks.Error
@@ -480,7 +493,8 @@ if ($bobLogin.Success) {
         -headers @{ Authorization = "Bearer $bobToken" }
     
     if ($bobProfile.Success) {
-        Write-TestResult "View Bob's profile" $true "Profile loaded"
+        $bobStudentId = $bobProfile.Data.id
+        Write-TestResult "View Bob's profile" $true "Profile loaded (ID: $bobStudentId)"
     }
     else {
         Write-TestResult "View Bob's profile" $false $bobProfile.Error

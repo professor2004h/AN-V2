@@ -1,0 +1,13 @@
+{
+    "name": "apranova-browser-tests",
+    "version": "1.0.0",
+    "description": "Browser automation tests for Apranova LMS",
+    "scripts": {
+        "test:browser": "playwright test",
+        "test:headed": "playwright test --headed",
+        "test:debug": "playwright test --debug"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.40.0"
+    }
+}
