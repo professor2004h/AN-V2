@@ -141,7 +141,7 @@ export class WorkspaceService {
 
             // Extract private IP from network interface
             const networkInterface = runningTask.attachments?.[0]?.details?.find(
-                (detail) => detail.name === 'privateIPv4Address'
+                (detail: any) => detail.name === 'privateIPv4Address'
             );
             const privateIp = networkInterface?.value;
 
