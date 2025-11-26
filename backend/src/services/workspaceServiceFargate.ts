@@ -113,8 +113,15 @@ export class WorkspaceService {
 
             const runTaskResponse = await ecs.send(runTaskCommand);
 
+            if (runTaskResponse.failures && runTaskResponse.failures.length > 0) {
+                const failure = runTaskResponse.failures[0];
+                const errorMsg = `Failed to launch code-server task: ${failure.reason} (ARN: ${failure.arn})`;
+                console.error(errorMsg, failure);
+                throw new Error(errorMsg);
+            }
+
             if (!runTaskResponse.tasks || runTaskResponse.tasks.length === 0) {
-                throw new Error('Failed to launch code-server task');
+                throw new Error('Failed to launch code-server task: No tasks returned');
             }
 
             const task = runTaskResponse.tasks[0];
