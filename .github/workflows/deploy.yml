@@ -74,7 +74,8 @@ jobs:
       id: terraform_output
       working-directory: ./terraform
       run: |
-        echo "alb_dns=$(terraform output -raw alb_dns_name)" >> $GITHUB_OUTPUT
+        ALB_DNS=$(terraform output -json alb_dns_name | jq -r '.')
+        echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
 
   build-and-deploy:
     name: Build and Deploy Docker Images
