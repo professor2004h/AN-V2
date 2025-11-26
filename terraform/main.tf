@@ -744,6 +744,14 @@ resource "aws_iam_role_policy" "ecs_task_efs" {
           "logs:PutLogEvents"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = [
+          aws_iam_role.ecs_task.arn,
+          aws_iam_role.ecs_task_execution.arn
+        ]
       }
     ]
   })
