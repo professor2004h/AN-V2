@@ -60,7 +60,7 @@ A complete, production-ready Learning Management System built with Node.js, Next
 ### DevOps
 - **Containers**: Docker + Docker Compose
 - **Orchestration**: AWS ECS Fargate
-- **IaC**: Terraform
+
 - **CI/CD**: GitHub Actions
 - **Monitoring**: AWS CloudWatch
 
@@ -134,7 +134,7 @@ apranova-lms/
 │   ├── components/     # Reusable components
 │   └── lib/           # Utils, hooks
 ├── docker/            # Docker configurations
-├── terraform/         # AWS infrastructure
+
 └── package.json       # Root package.json
 ```
 
@@ -182,13 +182,7 @@ npm run start
 docker-compose up -d
 ```
 
-### AWS Deployment (Terraform)
-```bash
-cd terraform
-terraform init
-terraform plan
-terraform apply
-```
+
 
 ## 📧 Email Service Setup
 
