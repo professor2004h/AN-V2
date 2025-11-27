@@ -171,6 +171,10 @@ export class WorkspaceService {
                 throw new Error('Failed to get task private IP address');
             }
 
+            // Cleanup old targets before registering new one
+            sendProgress('Cleaning up old workspace...', 73);
+            await this.cleanupOldWorkspaceTarget(studentId);
+
             // Register task with ALB target group
             sendProgress('Registering with load balancer...', 75);
             await this.registerWithTargetGroup(privateIp, studentId);
@@ -391,6 +395,64 @@ export class WorkspaceService {
             console.log(`Successfully deregistered ${privateIp} from target group`);
         } catch (error) {
             console.error('Failed to deregister from target group:', error);
+        }
+    }
+
+    private async cleanupOldWorkspaceTarget(studentId: string): Promise<void> {
+        if (!this.TARGET_GROUP_ARN) {
+            return;
+        }
+
+        try {
+            // Get student's current workspace info
+            const { data: student } = await supabaseAdmin
+                .from('students')
+                .select('workspace_task_arn')
+                .eq('id', studentId)
+                .single();
+
+            if (!student?.workspace_task_arn) {
+                console.log('No old workspace to cleanup');
+                return;
+            }
+
+            // Get old task details to extract IP
+            const describeTasksResponse = await ecs.send(new DescribeTasksCommand({
+                cluster: this.ECS_CLUSTER,
+                tasks: [student.workspace_task_arn],
+            }));
+
+            const oldTask = describeTasksResponse.tasks?.[0];
+            if (!oldTask) {
+                console.log('Old task not found, skipping cleanup');
+                return;
+            }
+
+            // Extract old task's private IP
+            const oldPrivateIpDetail = oldTask.attachments?.[0]?.details?.find(
+                (detail: any) => detail.name === 'privateIPv4Address'
+            );
+            const oldPrivateIp = oldPrivateIpDetail?.value;
+
+            if (oldPrivateIp) {
+                console.log(`Cleaning up old workspace target: ${oldPrivateIp}`);
+                await this.deregisterFromTargetGroup(oldPrivateIp);
+
+                // Stop old task
+                try {
+                    await ecs.send(new StopTaskCommand({
+                        cluster: this.ECS_CLUSTER,
+                        task: student.workspace_task_arn,
+                        reason: 'Replacing with new workspace',
+                    }));
+                    console.log(`Stopped old task: ${student.workspace_task_arn}`);
+                } catch (stopError) {
+                    console.warn('Failed to stop old task:', stopError);
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to cleanup old workspace target:', error);
+            // Don't throw - this is cleanup, not critical for new workspace
         }
     }
 
