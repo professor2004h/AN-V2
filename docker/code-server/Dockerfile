@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y \
     nano \
     htop \
     build-essential \
-    su-exec \
+    gosu \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

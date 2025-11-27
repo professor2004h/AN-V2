@@ -44,7 +44,7 @@ EOF
 fi
 
 # Start code-server as coder user
-exec su-exec coder code-server \
+exec gosu coder code-server \
     --bind-addr 0.0.0.0:8080 \
     --auth password \
     --disable-telemetry \
