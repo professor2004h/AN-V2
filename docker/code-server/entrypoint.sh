@@ -44,12 +44,12 @@ EOF
 fi
 
 # Start code-server as coder user
-# Use proxy-domain to tell code-server it's behind a reverse proxy
-# This ensures redirects (like after login) use the correct path
+# Note: We rely on the backend proxy to handle path rewriting
+# The PASSWORD env var is set by the backend when provisioning
 exec gosu coder code-server \
     --bind-addr 0.0.0.0:8080 \
     --auth password \
-    --proxy-domain "apranova-lms-alb-1990266756.us-east-1.elb.amazonaws.com/api/proxy/workspace/${STUDENT_ID}" \
     --disable-telemetry \
     --disable-update-check \
+    --app-name "Apranova IDE - Student ${STUDENT_ID}" \
     "${WORKSPACE_PATH}"

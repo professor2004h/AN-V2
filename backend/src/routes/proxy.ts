@@ -120,9 +120,29 @@ const workspaceProxy = createProxyMiddleware({
             });
         },
         proxyRes: (proxyRes: any, req: any, res: any) => {
+            // Rewrite Location header for redirects to include the proxy prefix
+            if (proxyRes.headers.location) {
+                const url = req.originalUrl || req.url || '';
+                const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+                const studentIdPart = match ? match[1] : null;
+
+                if (studentIdPart) {
+                    const location = proxyRes.headers.location;
+                    // If location is relative (starts with /), prepend the proxy path
+                    if (location.startsWith('/')) {
+                        proxyRes.headers.location = `/api/proxy/workspace/${studentIdPart}${location}`;
+                        logger.info('Rewrote redirect location', {
+                            original: location,
+                            rewritten: proxyRes.headers.location
+                        });
+                    }
+                }
+            }
+
             logger.debug('Proxy response', {
                 statusCode: proxyRes.statusCode,
-                headers: Object.keys(proxyRes.headers)
+                headers: Object.keys(proxyRes.headers),
+                location: proxyRes.headers.location
             });
         },
         error: (err: any, req: any, res: any) => {
