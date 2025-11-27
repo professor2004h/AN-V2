@@ -21,6 +21,7 @@ import messageRoutes from './routes/message';
 import workspaceRoutes from './routes/workspace';
 import analyticsRoutes from './routes/analytics';
 import setupRoutes from './routes/setup';
+import proxyRoutes from './routes/proxy';
 import { workspaceService } from './services/workspaceService';
 
 const app = express();
@@ -39,6 +40,9 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api/', limiter);
+
+// Proxy routes (must be before body parsing)
+app.use('/api/proxy', proxyRoutes);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

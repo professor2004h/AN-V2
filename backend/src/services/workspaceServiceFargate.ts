@@ -171,16 +171,15 @@ export class WorkspaceService {
                 throw new Error('Failed to get task private IP address');
             }
 
-            // Cleanup old targets before registering new one
+            // Cleanup old workspace task (stop it)
             sendProgress('Cleaning up old workspace...', 73);
             await this.cleanupOldWorkspaceTarget(studentId);
 
-            // Register task with ALB target group
-            sendProgress('Registering with load balancer...', 75);
-            await this.registerWithTargetGroup(privateIp, studentId);
+            // No need to register with ALB anymore as we use backend proxy
+            // await this.registerWithTargetGroup(privateIp, studentId);
 
-            // Use ALB-based URL instead of direct IP
-            const workspaceUrl = `http://${this.ALB_DNS_NAME}/workspace/${studentId}`;
+            // Use Backend Proxy URL
+            const workspaceUrl = `http://${this.ALB_DNS_NAME}/api/proxy/workspace/${studentId}`;
 
             // Update status to running
             sendProgress('Finalizing workspace...', 95);
@@ -435,8 +434,9 @@ export class WorkspaceService {
             const oldPrivateIp = oldPrivateIpDetail?.value;
 
             if (oldPrivateIp) {
-                console.log(`Cleaning up old workspace target: ${oldPrivateIp}`);
-                await this.deregisterFromTargetGroup(oldPrivateIp);
+                console.log(`Cleaning up old workspace task: ${oldPrivateIp}`);
+                // No need to deregister as we don't register anymore
+                // await this.deregisterFromTargetGroup(oldPrivateIp);
 
                 // Stop old task
                 try {
@@ -453,6 +453,34 @@ export class WorkspaceService {
         } catch (error) {
             console.warn('Failed to cleanup old workspace target:', error);
             // Don't throw - this is cleanup, not critical for new workspace
+        }
+    }
+
+    async getWorkspaceIp(studentId: string): Promise<string | null> {
+        try {
+            const { data: student } = await supabaseAdmin
+                .from('students')
+                .select('workspace_task_arn')
+                .eq('id', studentId)
+                .single();
+
+            if (!student?.workspace_task_arn) return null;
+
+            const describeTasksResponse = await ecs.send(new DescribeTasksCommand({
+                cluster: this.ECS_CLUSTER,
+                tasks: [student.workspace_task_arn],
+            }));
+
+            const task = describeTasksResponse.tasks?.[0];
+            if (!task) return null;
+
+            const privateIpDetail = task.attachments?.[0]?.details?.find(
+                (detail: any) => detail.name === 'privateIPv4Address'
+            );
+            return privateIpDetail?.value || null;
+        } catch (error) {
+            console.error('Failed to get workspace IP:', error);
+            return null;
         }
     }
 
