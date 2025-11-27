@@ -100,11 +100,6 @@ const workspaceProxy = createProxyMiddleware({
         logger.debug('Path rewrite', { original: path, rewritten: finalPath });
         return finalPath;
     },
-    cookiePathRewrite: (cookiePath: string) => {
-        // For now, we'll handle cookie paths in the response
-        // This is a placeholder - actual implementation would need request context
-        return cookiePath;
-    },
     on: {
         proxyReq: (proxyReq: any, req: any, res: any) => {
             // Extract studentId to set X-Forwarded-Prefix
