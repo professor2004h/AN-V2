@@ -101,9 +101,18 @@ const workspaceProxy = createProxyMiddleware({
     },
     on: {
         proxyReq: (proxyReq: any, req: any, res: any) => {
+            // Extract studentId to set X-Forwarded-Prefix
+            // This tells code-server the base path so redirects work correctly
+            const url = req.originalUrl || req.url || '';
+            const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+            const studentIdPart = match ? match[1] : null;
+
+            if (studentIdPart) {
+                proxyReq.setHeader('X-Forwarded-Prefix', `/api/proxy/workspace/${studentIdPart}`);
+            }
+
             // Remove the base path prefix for code-server
             // code-server expects paths without the /api/proxy/workspace/:id prefix
-            const url = req.originalUrl || req.url || '';
             logger.debug('Proxy request', {
                 originalUrl: url,
                 method: req.method,
@@ -135,6 +144,15 @@ async function verifyAccess(req: Request, res: Response, next: NextFunction) {
 
         if (!studentId) {
             return res.status(400).json({ error: 'Student ID is required' });
+        }
+
+        // Handle trailing slash redirect for root workspace path
+        // This ensures relative redirects (like ./login) work correctly
+        // Check if path ends with studentId (no trailing slash)
+        const url = req.originalUrl.split('?')[0];
+        if (url.endsWith(studentId)) {
+            logger.info('Redirecting to add trailing slash', { from: req.originalUrl });
+            return res.redirect(301, req.originalUrl.replace(studentId, studentId + '/'));
         }
 
         const hasAccess = await verifyWorkspaceAccess(req, studentId);
