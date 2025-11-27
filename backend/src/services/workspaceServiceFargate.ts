@@ -111,6 +111,13 @@ export class WorkspaceService {
                 ],
             });
 
+            console.log('[DEBUG] RunTaskCommand config:', JSON.stringify({
+                cluster: this.ECS_CLUSTER,
+                subnets: this.SUBNETS,
+                securityGroup: this.SECURITY_GROUP,
+                assignPublicIp: 'ENABLED'
+            }));
+
             const runTaskResponse = await ecs.send(runTaskCommand);
 
             if (runTaskResponse.failures && runTaskResponse.failures.length > 0) {
