@@ -1,3 +1,4 @@
+
 import { Router, Request, Response, NextFunction } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { workspaceService } from '../services/workspaceService';
@@ -99,6 +100,11 @@ const workspaceProxy = createProxyMiddleware({
         logger.debug('Path rewrite', { original: path, rewritten: finalPath });
         return finalPath;
     },
+    cookiePathRewrite: (cookiePath: string) => {
+        // For now, we'll handle cookie paths in the response
+        // This is a placeholder - actual implementation would need request context
+        return cookiePath;
+    },
     on: {
         proxyReq: (proxyReq: any, req: any, res: any) => {
             // Extract studentId to set X-Forwarded-Prefix
@@ -151,22 +157,29 @@ const workspaceProxy = createProxyMiddleware({
                 }
             }
 
+            // Rewrite Set-Cookie header paths
+            if (proxyRes.headers['set-cookie']) {
+                const url = req.originalUrl || req.url || '';
+                const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+                const studentIdPart = match ? match[1] : null;
+
+                if (studentIdPart) {
+                    const cookies = Array.isArray(proxyRes.headers['set-cookie'])
+                        ? proxyRes.headers['set-cookie']
+                        : [proxyRes.headers['set-cookie']];
+
+                    proxyRes.headers['set-cookie'] = cookies.map((cookie: string) => {
+                        // Rewrite Path=/ to Path=/api/proxy/workspace/:studentId/
+                        return cookie.replace(/Path=\//gi, `Path=/api/proxy/workspace/${studentIdPart}/`);
+                    });
+                }
+            }
+
             logger.debug('Proxy response', {
                 statusCode: proxyRes.statusCode,
                 headers: Object.keys(proxyRes.headers),
                 location: proxyRes.headers.location
             });
-        },
-        cookiePathRewrite: (path: string, req: any) => {
-            const url = req.originalUrl || req.url || '';
-            const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
-            const studentIdPart = match ? match[1] : null;
-
-            if (studentIdPart) {
-                // Rewrite cookie path to be specific to this workspace proxy
-                return path.replace('/', `/api/proxy/workspace/${studentIdPart}/`);
-            }
-            return path;
         },
         error: (err: any, req: any, res: any) => {
             logger.error('Proxy error:', { error: err.message, url: req.url });
