@@ -1,5 +1,5 @@
 import { Router, Request } from 'express';
-import { createProxyMiddleware, RequestHandler } from 'http-proxy-middleware';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { workspaceService } from '../services/workspaceService';
 import { supabaseAdmin } from '../lib/supabase';
@@ -38,7 +38,7 @@ async function getWorkspaceIp(studentId: string): Promise<string | null> {
 }
 
 // Proxy middleware
-const workspaceProxy: RequestHandler = createProxyMiddleware({
+const workspaceProxy = createProxyMiddleware({
     target: 'http://localhost:8080',
     changeOrigin: true,
     ws: true,
