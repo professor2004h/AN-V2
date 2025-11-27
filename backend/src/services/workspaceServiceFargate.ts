@@ -96,12 +96,8 @@ export class WorkspaceService {
                                     value: `/workspaces/${studentId}`,
                                 },
                                 {
-                                    name: 'AUTH',
-                                    value: 'none',
-                                },
-                                {
                                     name: 'PASSWORD',
-                                    value: '',
+                                    value: 'workspace',
                                 },
                             ],
                         },
