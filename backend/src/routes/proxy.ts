@@ -22,8 +22,15 @@ async function getWorkspaceIp(studentId: string): Promise<string | null> {
 }
 
 // Helper to verify workspace exists and is running
-async function verifyWorkspaceAccess(studentId: string): Promise<boolean> {
+async function verifyWorkspaceAccess(req: any, studentId: string): Promise<boolean> {
     try {
+        logger.info('Verifying access for student', {
+            studentId,
+            url: req.url,
+            originalUrl: req.originalUrl,
+            params: req.params
+        });
+
         const { data, error } = await supabaseAdmin
             .from('students')
             .select('workspace_status, workspace_task_arn')
@@ -31,9 +38,15 @@ async function verifyWorkspaceAccess(studentId: string): Promise<boolean> {
             .single();
 
         if (error || !data) {
-            logger.warn('Student not found for workspace access', { studentId });
+            logger.warn('Student not found for workspace access', { studentId, error });
             return false;
         }
+
+        logger.info('Workspace status check', {
+            studentId,
+            status: data.workspace_status,
+            taskArn: data.workspace_task_arn
+        });
 
         if (data.workspace_status !== 'running' || !data.workspace_task_arn) {
             logger.warn('Workspace not running', { studentId, status: data.workspace_status });
@@ -124,7 +137,7 @@ async function verifyAccess(req: Request, res: Response, next: NextFunction) {
             return res.status(400).json({ error: 'Student ID is required' });
         }
 
-        const hasAccess = await verifyWorkspaceAccess(studentId);
+        const hasAccess = await verifyWorkspaceAccess(req, studentId);
         if (!hasAccess) {
             return res.status(403).json({
                 error: 'Workspace not accessible',
