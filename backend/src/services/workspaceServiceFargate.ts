@@ -79,7 +79,7 @@ export class WorkspaceService {
                     awsvpcConfiguration: {
                         subnets: this.SUBNETS,
                         securityGroups: [this.SECURITY_GROUP],
-                        assignPublicIp: 'ENABLED',
+                        assignPublicIp: 'DISABLED',
                     },
                 },
                 overrides: {
@@ -94,6 +94,14 @@ export class WorkspaceService {
                                 {
                                     name: 'WORKSPACE_PATH',
                                     value: `/workspaces/${studentId}`,
+                                },
+                                {
+                                    name: 'AUTH',
+                                    value: 'none',
+                                },
+                                {
+                                    name: 'PASSWORD',
+                                    value: '',
                                 },
                             ],
                         },
