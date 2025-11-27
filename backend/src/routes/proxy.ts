@@ -127,12 +127,24 @@ const workspaceProxy = createProxyMiddleware({
                 const studentIdPart = match ? match[1] : null;
 
                 if (studentIdPart) {
-                    const location = proxyRes.headers.location;
+                    let location = proxyRes.headers.location;
+                    const proxyPath = `/api/proxy/workspace/${studentIdPart}`;
+
+                    // Handle absolute URLs pointing to internal IP
+                    // Regex to match http://10.x.x.x:8080 or similar
+                    const internalUrlRegex = /^http:\/\/(?:10\.|172\.|192\.|localhost)[^/]+(.*)/;
+                    const internalMatch = location.match(internalUrlRegex);
+
+                    if (internalMatch) {
+                        // It's an internal absolute URL, rewrite to proxy path
+                        location = internalMatch[1] || '/'; // Get the path part
+                    }
+
                     // If location is relative (starts with /), prepend the proxy path
                     if (location.startsWith('/')) {
-                        proxyRes.headers.location = `/api/proxy/workspace/${studentIdPart}${location}`;
+                        proxyRes.headers.location = `${proxyPath}${location}`;
                         logger.info('Rewrote redirect location', {
-                            original: location,
+                            original: proxyRes.headers.location,
                             rewritten: proxyRes.headers.location
                         });
                     }
@@ -144,6 +156,17 @@ const workspaceProxy = createProxyMiddleware({
                 headers: Object.keys(proxyRes.headers),
                 location: proxyRes.headers.location
             });
+        },
+        cookiePathRewrite: (path: string, req: any) => {
+            const url = req.originalUrl || req.url || '';
+            const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+            const studentIdPart = match ? match[1] : null;
+
+            if (studentIdPart) {
+                // Rewrite cookie path to be specific to this workspace proxy
+                return path.replace('/', `/api/proxy/workspace/${studentIdPart}/`);
+            }
+            return path;
         },
         error: (err: any, req: any, res: any) => {
             logger.error('Proxy error:', { error: err.message, url: req.url });
