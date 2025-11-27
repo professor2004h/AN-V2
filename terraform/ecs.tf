@@ -209,6 +209,10 @@ resource "aws_ecs_task_definition" "code_server" {
       {
         name  = "SUDO_PASSWORD"
         value = "workspace"
+      },
+      {
+        name  = "FORCE_UPDATE"
+        value = "2025-11-27-17-37"
       }
     ]
 
