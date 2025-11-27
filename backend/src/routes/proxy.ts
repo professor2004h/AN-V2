@@ -64,7 +64,7 @@ const workspaceProxy = createProxyMiddleware({
         // Regex to match /api/proxy/workspace/UUID
         return path.replace(/^\/api\/proxy\/workspace\/[a-zA-Z0-9-]+/, '');
     },
-    onProxyReq: (proxyReq, req: any, res) => {
+    onProxyReq: (proxyReq: any, req: any, res: any) => {
         // Set X-Forwarded-Prefix so code-server knows its base path
         // The base path is /api/proxy/workspace/:studentId
         const pathParts = req.originalUrl.split('/');
@@ -85,7 +85,7 @@ const workspaceProxy = createProxyMiddleware({
 
         // Pass auth token if needed? No, code-server uses password.
     },
-    onError: (err, req, res) => {
+    onError: (err: any, req: any, res: any) => {
         console.error('Proxy error:', err);
         res.status(502).send('Bad Gateway: Unable to connect to workspace');
     }
