@@ -194,7 +194,7 @@ resource "aws_ecs_task_definition" "code_server" {
 
   container_definitions = jsonencode([{
     name  = "code-server"
-    image = "${aws_ecr_repository.code_server.repository_url}:latest"
+    image = "${aws_ecr_repository.code_server.repository_url}@sha256:3e161fd8466f1245703e1605c874eae86a181585d6022a3f2c75f4594d8f2c60"
     
     portMappings = [{
       containerPort = 8080
@@ -212,7 +212,7 @@ resource "aws_ecs_task_definition" "code_server" {
       },
       {
         name  = "FORCE_UPDATE"
-        value = "2025-11-27-17-37"
+        value = "2025-11-27-18-25"
       }
     ]
 
