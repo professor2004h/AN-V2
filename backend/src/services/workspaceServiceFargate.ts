@@ -1,8 +1,10 @@
 import { supabaseAdmin } from '../lib/supabase';
 import { ECSClient, RunTaskCommand, StopTaskCommand, DescribeTasksCommand, ListTasksCommand } from '@aws-sdk/client-ecs';
+import { ElasticLoadBalancingV2Client, RegisterTargetsCommand, DeregisterTargetsCommand } from '@aws-sdk/client-elastic-load-balancing-v2';
 import { notificationService } from './notificationService';
 
 const ecs = new ECSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const elbv2 = new ElasticLoadBalancingV2Client({ region: process.env.AWS_REGION || 'us-east-1' });
 
 // Progress callback type for real-time updates
 export type ProgressCallback = (message: string, progress: number) => void;
@@ -13,6 +15,8 @@ export class WorkspaceService {
     private readonly SUBNETS = (process.env.CODE_SERVER_SUBNETS || '').split(',');
     private readonly SECURITY_GROUP = process.env.CODE_SERVER_SECURITY_GROUP || '';
     private readonly EFS_FILE_SYSTEM_ID = process.env.EFS_FILE_SYSTEM_ID || '';
+    private readonly TARGET_GROUP_ARN = process.env.CODE_SERVER_TARGET_GROUP_ARN || '';
+    private readonly ALB_DNS_NAME = process.env.ALB_DNS_NAME || '';
 
     // ==================== WORKSPACE PROVISIONING ====================
 
@@ -153,41 +157,22 @@ export class WorkspaceService {
                 throw new Error('Failed to get task details');
             }
 
-            // Extract public IP from network interface
-            const networkInterface = runningTask.attachments?.[0]?.details?.find(
-                (detail: any) => detail.name === 'networkInterfaceId'
+            // Extract private IP from network interface
+            const privateIpDetail = runningTask.attachments?.[0]?.details?.find(
+                (detail: any) => detail.name === 'privateIPv4Address'
             );
-            const eniId = networkInterface?.value;
+            const privateIp = privateIpDetail?.value;
 
-            if (!eniId) {
-                throw new Error('Failed to get network interface ID');
+            if (!privateIp) {
+                throw new Error('Failed to get task private IP address');
             }
 
-            // Get public IP from ENI
-            // Note: For Fargate tasks with public IP, we need to query the ENI
-            // For now, we'll use a different approach - get it from task metadata
-            let publicIp: string | undefined;
+            // Register task with ALB target group
+            sendProgress('Registering with load balancer...', 75);
+            await this.registerWithTargetGroup(privateIp, studentId);
 
-            // Try to get public IP from attachments
-            const publicIpDetail = runningTask.attachments?.[0]?.details?.find(
-                (detail: any) => detail.name === 'publicIPv4Address'
-            );
-
-            if (publicIpDetail?.value) {
-                publicIp = publicIpDetail.value;
-            } else {
-                // Fallback: use private IP (will work if accessing from within VPC)
-                const privateIpDetail = runningTask.attachments?.[0]?.details?.find(
-                    (detail: any) => detail.name === 'privateIPv4Address'
-                );
-                publicIp = privateIpDetail?.value;
-            }
-
-            if (!publicIp) {
-                throw new Error('Failed to get task IP address');
-            }
-
-            const workspaceUrl = `http://${publicIp}:8080`;
+            // Use ALB-based URL instead of direct IP
+            const workspaceUrl = `http://${this.ALB_DNS_NAME}/workspace/${studentId}`;
 
             // Update status to running
             sendProgress('Finalizing workspace...', 95);
@@ -361,6 +346,48 @@ export class WorkspaceService {
         }
 
         throw new Error('Task failed to start within timeout period');
+    }
+
+    private async registerWithTargetGroup(privateIp: string, studentId: string): Promise<void> {
+        if (!this.TARGET_GROUP_ARN) {
+            console.warn('No target group ARN configured, skipping registration');
+            return;
+        }
+
+        try {
+            console.log(`Registering ${privateIp} with target group for student ${studentId}`);
+            await elbv2.send(new RegisterTargetsCommand({
+                TargetGroupArn: this.TARGET_GROUP_ARN,
+                Targets: [{
+                    Id: privateIp,
+                    Port: 8080,
+                }],
+            }));
+            console.log(`Successfully registered ${privateIp} with target group`);
+        } catch (error) {
+            console.error('Failed to register with target group:', error);
+            throw new Error(`Failed to register workspace with load balancer: ${error}`);
+        }
+    }
+
+    private async deregisterFromTargetGroup(privateIp: string): Promise<void> {
+        if (!this.TARGET_GROUP_ARN) {
+            return;
+        }
+
+        try {
+            console.log(`Deregistering ${privateIp} from target group`);
+            await elbv2.send(new DeregisterTargetsCommand({
+                TargetGroupArn: this.TARGET_GROUP_ARN,
+                Targets: [{
+                    Id: privateIp,
+                    Port: 8080,
+                }],
+            }));
+            console.log(`Successfully deregistered ${privateIp} from target group`);
+        } catch (error) {
+            console.error('Failed to deregister from target group:', error);
+        }
     }
 
     // ==================== CLEANUP & ACTIVITY ====================

@@ -134,6 +134,14 @@ resource "aws_ecs_task_definition" "backend" {
       {
         name  = "AWS_REGION"
         value = var.aws_region
+      },
+      {
+        name  = "CODE_SERVER_TARGET_GROUP_ARN"
+        value = aws_lb_target_group.code_server.arn
+      },
+      {
+        name  = "ALB_DNS_NAME"
+        value = data.aws_lb.main.dns_name
       }
     ]
 
