@@ -5,6 +5,11 @@ set -e
 STUDENT_ID=${STUDENT_ID:-"default"}
 WORKSPACE_PATH=${WORKSPACE_PATH:-"/workspaces/${STUDENT_ID}"}
 
+echo "DEBUG: Starting code-server entrypoint script (VERSION 3)"
+echo "DEBUG: Dumping entrypoint content:"
+cat $0
+echo "DEBUG: End of entrypoint dump"
+
 echo "Starting code-server for student: ${STUDENT_ID}"
 echo "Workspace path: ${WORKSPACE_PATH}"
 

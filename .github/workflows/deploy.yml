@@ -154,7 +154,7 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         cd docker/code-server
-        docker build \
+        docker build --no-cache \
           -t $ECR_REGISTRY/$ECR_CODE_SERVER_REPO:$IMAGE_TAG \
           -t $ECR_REGISTRY/$ECR_CODE_SERVER_REPO:latest .
         docker push $ECR_REGISTRY/$ECR_CODE_SERVER_REPO:$IMAGE_TAG
