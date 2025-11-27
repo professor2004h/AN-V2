@@ -54,15 +54,13 @@ const workspaceProxy = createProxyMiddleware({
     ws: true, // Enable WebSocket proxying
     router: async (req: Request) => {
         try {
-            // Extract studentId from URL
-            const url = req.url || '';
-            const pathParts = url.split('/');
-            // URL: /workspace/:studentId/...
-            // pathParts: ['', 'workspace', ':studentId', ...]
-            const studentIdPart = pathParts[1];
+            // Extract studentId from URL using originalUrl because req.url is stripped by Express
+            const url = req.originalUrl || '';
+            const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+            const studentIdPart = match ? match[1] : null;
 
             if (!studentIdPart) {
-                logger.error('No studentId in proxy path', { url });
+                logger.error('No studentId found in proxy path', { url });
                 return undefined;
             }
 
