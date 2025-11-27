@@ -128,26 +128,31 @@ const workspaceProxy = createProxyMiddleware({
                 const studentIdPart = match ? match[1] : null;
 
                 if (studentIdPart) {
-                    let location = proxyRes.headers.location;
+                    const originalLocation = proxyRes.headers.location;
+                    let location = originalLocation;
                     const proxyPath = `/api/proxy/workspace/${studentIdPart}`;
 
                     // Handle absolute URLs pointing to internal IP
-                    // Regex to match http://10.x.x.x:8080 or similar
-                    const internalUrlRegex = /^http:\/\/(?:10\.|172\.|192\.|localhost)[^/]+(.*)/;
+                    // Regex to match http(s)://10.x.x.x:8080/path or similar private IPs
+                    const internalUrlRegex = /^https?:\/\/(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.|localhost|127\.)[^/]+(.*)/;
                     const internalMatch = location.match(internalUrlRegex);
 
                     if (internalMatch) {
-                        // It's an internal absolute URL, rewrite to proxy path
-                        location = internalMatch[1] || '/'; // Get the path part
+                        // It's an internal absolute URL, extract just the path part
+                        location = internalMatch[1] || '/';
+                        logger.info('Detected internal absolute URL redirect', { original: originalLocation, extracted: location });
                     }
 
                     // If location is relative (starts with /), prepend the proxy path
                     if (location.startsWith('/')) {
                         proxyRes.headers.location = `${proxyPath}${location}`;
                         logger.info('Rewrote redirect location', {
-                            original: proxyRes.headers.location,
+                            original: originalLocation,
                             rewritten: proxyRes.headers.location
                         });
+                    } else {
+                        // If it's still an absolute URL that we didn't catch, log it
+                        logger.warn('Unhandled absolute URL in Location header', { location: originalLocation });
                     }
                 }
             }
