@@ -214,7 +214,7 @@ resource "aws_ecs_task_definition" "code_server" {
 
     mountPoints = [{
       sourceVolume  = "workspace-storage"
-      containerPath = "/home/coder"
+      containerPath = "/workspaces"
       readOnly      = false
     }]
 

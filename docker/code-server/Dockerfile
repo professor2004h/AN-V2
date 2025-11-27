@@ -7,7 +7,7 @@ FROM codercom/code-server:latest
 # Install essential development tools
 USER root
 
-# Update and install packages
+# Update and install packages (including su-exec for user switching)
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     nano \
     htop \
     build-essential \
+    su-exec \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -41,8 +42,8 @@ RUN npm install -g \
     nodemon \
     pm2
 
-# Create workspace directory
-RUN mkdir -p /home/coder/workspace
+# Create workspaces root directory (EFS will be mounted here)
+RUN mkdir -p /workspaces && chown -R coder:coder /workspaces
 
 # Set up code-server settings for auto-save
 RUN mkdir -p /home/coder/.local/share/code-server/User && \
@@ -69,11 +70,9 @@ RUN code-server --install-extension ms-python.python && \
 # Set proper permissions
 RUN chown -R coder:coder /home/coder
 
-# Switch back to coder user
-USER coder
-
-# Set working directory
-WORKDIR /home/coder
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose code-server port
 EXPOSE 8080
@@ -82,5 +81,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:8080/healthz || exit 1
 
-# Start code-server
-CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "--auth", "password", "/home/coder"]
+# Use entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
