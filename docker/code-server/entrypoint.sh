@@ -51,10 +51,16 @@ fi
 # Start code-server as coder user
 # Note: We rely on the backend proxy to handle path rewriting
 # The PASSWORD env var is set by the backend when provisioning
+
+# CRITICAL: Remove any existing config file that might override our settings
+rm -f /home/coder/.config/code-server/config.yaml
+
+# Start code-server with explicit flags and disabled config file
 exec gosu coder code-server \
     --bind-addr 0.0.0.0:8080 \
     --auth password \
     --disable-telemetry \
     --disable-update-check \
     --app-name "Apranova IDE - Student ${STUDENT_ID}" \
+    --config /dev/null \
     "${WORKSPACE_PATH}"
