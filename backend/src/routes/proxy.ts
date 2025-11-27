@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { Router, Request } from 'express';
+import { createProxyMiddleware, RequestHandler } from 'http-proxy-middleware';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { workspaceService } from '../services/workspaceService';
 import { supabaseAdmin } from '../lib/supabase';
@@ -27,78 +27,74 @@ async function verifyStudentAccess(req: AuthRequest, studentId: string): Promise
     return ['trainer', 'admin', 'superadmin'].includes(req.user!.role);
 }
 
+// Helper to get workspace IP
+async function getWorkspaceIp(studentId: string): Promise<string | null> {
+    // Type assertion since we know we're using Fargate in production
+    const service = workspaceService as any;
+    if (typeof service.getWorkspaceIp === 'function') {
+        return await service.getWorkspaceIp(studentId);
+    }
+    return null;
+}
+
 // Proxy middleware
-const workspaceProxy = createProxyMiddleware({
-    target: 'http://localhost:8080', // Placeholder, will be overwritten by router
+const workspaceProxy: RequestHandler = createProxyMiddleware({
+    target: 'http://localhost:8080',
     changeOrigin: true,
-    ws: true, // Enable WebSocket support
-    router: async (req) => {
+    ws: true,
+    router: async (req: Request) => {
         try {
-            // Extract studentId from path: /api/proxy/workspace/:studentId/...
-            const pathParts = req.path.split('/');
-            // req.path is relative to where router is mounted.
-            // If mounted at /api/proxy, req.path starts with /workspace/:studentId
-            // pathParts[0] = empty, pathParts[1] = workspace, pathParts[2] = studentId
-
+            // Extract studentId from URL
+            const url = req.url || '';
+            const pathParts = url.split('/');
+            // URL: /workspace/:studentId/...
+            // pathParts: ['', 'workspace', ':studentId', ...]
             const studentId = pathParts[2];
-            if (!studentId) return undefined;
 
-            // Get IP
-            const ip = await workspaceService.getWorkspaceIp(studentId);
+            if (!studentId) {
+                console.error('No studentId in path');
+                return undefined;
+            }
+
+            const ip = await getWorkspaceIp(studentId);
             if (!ip) {
                 console.error(`No IP found for workspace ${studentId}`);
                 return undefined;
             }
 
+            console.log(`Proxying to workspace ${studentId} at ${ip}:8080`);
             return `http://${ip}:8080`;
         } catch (error) {
             console.error('Proxy router error:', error);
             return undefined;
         }
     },
-    pathRewrite: (path, req) => {
-        // Strip /api/proxy/workspace/:studentId
-        // Path comes in as /api/proxy/workspace/:studentId/foo
-        // We want /foo
-
-        // Regex to match /api/proxy/workspace/UUID
-        return path.replace(/^\/api\/proxy\/workspace\/[a-zA-Z0-9-]+/, '');
+    pathRewrite: (path: string) => {
+        // Strip /workspace/:studentId prefix
+        // Input: /workspace/abc-123/some/path
+        // Output: /some/path
+        const rewritten = path.replace(/^\/workspace\/[a-zA-Z0-9-]+/, '');
+        return rewritten || '/';
     },
-    onProxyReq: (proxyReq: any, req: any, res: any) => {
-        // Set X-Forwarded-Prefix so code-server knows its base path
-        // The base path is /api/proxy/workspace/:studentId
-        const pathParts = req.originalUrl.split('/');
-        // originalUrl is full path: /api/proxy/workspace/:studentId/foo
-        // We want /api/proxy/workspace/:studentId
-        const studentId = pathParts[4]; // /api/proxy/workspace/:studentId
-
-        // Construct prefix carefully
-        // originalUrl: /api/proxy/workspace/123/login
-        // prefix: /api/proxy/workspace/123
-
-        // Find index of 'workspace'
-        const workspaceIndex = pathParts.indexOf('workspace');
-        if (workspaceIndex !== -1 && pathParts[workspaceIndex + 1]) {
-            const prefix = pathParts.slice(0, workspaceIndex + 2).join('/');
-            proxyReq.setHeader('X-Forwarded-Prefix', prefix);
+    on: {
+        proxyReq: (proxyReq, req: any) => {
+            // Set X-Forwarded-Prefix for code-server
+            const url = req.originalUrl || req.url || '';
+            const match = url.match(/^(\/api\/proxy\/workspace\/[a-zA-Z0-9-]+)/);
+            if (match) {
+                proxyReq.setHeader('X-Forwarded-Prefix', match[1]);
+            }
+        },
+        error: (err, req, res: any) => {
+            console.error('Proxy error:', err);
+            if (!res.headersSent) {
+                res.status(502).send('Bad Gateway: Unable to connect to workspace');
+            }
         }
-
-        // Pass auth token if needed? No, code-server uses password.
-    },
-    onError: (err: any, req: any, res: any) => {
-        console.error('Proxy error:', err);
-        res.status(502).send('Bad Gateway: Unable to connect to workspace');
     }
 });
 
-// Mount proxy
-// We need to handle authentication before proxying
-// But http-proxy-middleware handles the request, so we need a wrapper or use it as a handler
-// Also, we need to handle Upgrade requests for WebSockets
-
-// We can't use `router.use` with `authenticate` easily because `authenticate` consumes the body?
-// No, `authenticate` just checks headers.
-
+// Mount proxy with authentication
 router.use('/workspace/:studentId', authenticate, async (req: AuthRequest, res, next) => {
     const { studentId } = req.params;
 
@@ -107,14 +103,6 @@ router.use('/workspace/:studentId', authenticate, async (req: AuthRequest, res, 
         if (!hasAccess) {
             return res.status(403).json({ error: 'Access denied' });
         }
-
-        // If access granted, continue to proxy
-        // But we need to make sure we don't consume the stream if it's a POST/PUT
-        // `authenticate` middleware doesn't consume stream.
-
-        // However, `express.json()` middleware GLOBAL in index.ts MIGHT consume the stream!
-        // This is a common issue.
-        // We need to ensure this route is mounted BEFORE body parsers, or disable body parsing for this route.
 
         next();
     } catch (error) {
