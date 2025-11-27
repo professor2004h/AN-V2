@@ -741,7 +741,9 @@ resource "aws_iam_role_policy" "ecs_task_efs" {
           "ecs:ListTasks",
           "ecs:RunTask",
           "ecs:StopTask",
-          "ecs:TagResource"
+          "ecs:TagResource",
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:DeregisterTargets"
         ]
         Resource = "*"
       },
