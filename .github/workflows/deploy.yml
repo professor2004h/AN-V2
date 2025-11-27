@@ -63,6 +63,7 @@ jobs:
         TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
         TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_code_server_image_tag: ${{ github.sha }}
       run: terraform plan -out=tfplan
 
     - name: Terraform Apply
@@ -73,6 +74,7 @@ jobs:
         TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
         TF_VAR_stripe_publishable_key: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        TF_VAR_code_server_image_tag: ${{ github.sha }}
       run: terraform apply -auto-approve tfplan
 
     - name: Get Terraform Outputs

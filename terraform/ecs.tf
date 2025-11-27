@@ -194,7 +194,7 @@ resource "aws_ecs_task_definition" "code_server" {
 
   container_definitions = jsonencode([{
     name  = "code-server"
-    image = "${aws_ecr_repository.code_server.repository_url}@sha256:3e161fd8466f1245703e1605c874eae86a181585d6022a3f2c75f4594d8f2c60"
+    image = "${aws_ecr_repository.code_server.repository_url}:${var.code_server_image_tag}"
     
     portMappings = [{
       containerPort = 8080
@@ -209,10 +209,6 @@ resource "aws_ecs_task_definition" "code_server" {
       {
         name  = "SUDO_PASSWORD"
         value = "workspace"
-      },
-      {
-        name  = "FORCE_UPDATE"
-        value = "2025-11-27-18-25"
       }
     ]
 

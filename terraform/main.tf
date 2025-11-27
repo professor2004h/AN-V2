@@ -123,6 +123,12 @@ variable "code_server_max_memory" {
   default     = 8192  # 8 GB for heavy workloads
 }
 
+variable "code_server_image_tag" {
+  description = "Docker image tag for code-server (e.g. git sha or latest)"
+  type        = string
+  default     = "latest"
+}
+
 # ============================================
 # DATA SOURCES
 # ============================================
