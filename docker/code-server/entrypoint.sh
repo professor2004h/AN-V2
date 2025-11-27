@@ -48,19 +48,21 @@ EOF
     chown coder:coder "${WORKSPACE_PATH}/README.md"
 fi
 
-# Start code-server as coder user
-# Note: We rely on the backend proxy to handle path rewriting
-# The PASSWORD env var is set by the backend when provisioning
+# Start code-server with MINIMAL flags - pure code-server experience
+# Remove any existing config that might interfere
+rm -rf /home/coder/.config/code-server/
+rm -rf /home/coder/.local/share/code-server/Machine/
 
-# CRITICAL: Remove any existing config file that might override our settings
-rm -f /home/coder/.config/code-server/config.yaml
+# Create minimal config to ensure password-only auth
+mkdir -p /home/coder/.config/code-server
+cat > /home/coder/.config/code-server/config.yaml <<EOF
+bind-addr: 0.0.0.0:8080
+auth: password
+password: ${PASSWORD}
+cert: false
+EOF
 
-# Start code-server with explicit flags and disabled config file
-exec gosu coder code-server \
-    --bind-addr 0.0.0.0:8080 \
-    --auth password \
-    --disable-telemetry \
-    --disable-update-check \
-    --app-name "Apranova IDE - Student ${STUDENT_ID}" \
-    --config /dev/null \
-    "${WORKSPACE_PATH}"
+chown -R coder:coder /home/coder/.config
+
+# Start code-server as coder user with workspace path only
+exec gosu coder /usr/bin/code-server "${WORKSPACE_PATH}"
