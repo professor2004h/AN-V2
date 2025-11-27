@@ -204,11 +204,11 @@ resource "aws_ecs_task_definition" "code_server" {
     environment = [
       {
         name  = "PASSWORD"
-        value = "apranova123"
+        value = "workspace"
       },
       {
         name  = "SUDO_PASSWORD"
-        value = "apranova123"
+        value = "workspace"
       }
     ]
 
