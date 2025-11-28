@@ -64,5 +64,9 @@ EOF
 
 chown -R coder:coder /home/coder/.config
 
-# Start code-server as coder user with workspace path only
-exec gosu coder /usr/bin/code-server "${WORKSPACE_PATH}"
+# Start code-server as coder user with explicit flags for proxy setup
+#Note: We keep auth: password in config.yaml but add --proxy-domain as CLI flag
+# This tells code-server it's behind a proxy, helping it construct correct redirect URLs
+exec gosu coder /usr/bin/code-server \
+    --proxy-domain "${PROXY_DOMAIN:-apranova-lms-alb-1990266756.us-east-1.elb.amazonaws.com}" \
+    "${WORKSPACE_PATH}"
