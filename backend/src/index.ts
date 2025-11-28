@@ -31,8 +31,30 @@ app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
+// CORS configuration
+const allowedOrigins = [
+  config.frontendUrl,
+  'http://ecombinators.com',
+  'https://ecombinators.com',
+  'http://www.ecombinators.com',
+  'https://www.ecombinators.com',
+  'http://localhost:3000',
+  'http://apranova-lms-alb-1990266756.us-east-1.elb.amazonaws.com'
+];
+
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Log blocked origin for debugging
+      logger.warn(`Blocked by CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 

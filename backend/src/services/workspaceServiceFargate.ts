@@ -17,6 +17,7 @@ export class WorkspaceService {
     private readonly EFS_FILE_SYSTEM_ID = process.env.EFS_FILE_SYSTEM_ID || '';
     private readonly TARGET_GROUP_ARN = process.env.CODE_SERVER_TARGET_GROUP_ARN || '';
     private readonly ALB_DNS_NAME = process.env.ALB_DNS_NAME || '';
+    private readonly DOMAIN = process.env.DOMAIN || process.env.ALB_DNS_NAME || 'ecombinators.com';
 
     // ==================== WORKSPACE PROVISIONING ====================
 
@@ -182,8 +183,8 @@ export class WorkspaceService {
             // No need to register with ALB anymore as we use backend proxy
             // await this.registerWithTargetGroup(privateIp, studentId);
 
-            // Use Backend Proxy URL
-            const workspaceUrl = `http://${this.ALB_DNS_NAME}/api/proxy/workspace/${studentId}`;
+            // Use Backend Proxy URL with custom domain
+            const workspaceUrl = `http://${this.DOMAIN}/api/proxy/workspace/${studentId}`;
 
             // Update status to running
             sendProgress('Finalizing workspace...', 95);

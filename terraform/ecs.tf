@@ -142,6 +142,10 @@ resource "aws_ecs_task_definition" "backend" {
       {
         name  = "ALB_DNS_NAME"
         value = data.aws_lb.main.dns_name
+      },
+      {
+        name  = "DOMAIN"
+        value = "ecombinators.com"
       }
     ]
 
