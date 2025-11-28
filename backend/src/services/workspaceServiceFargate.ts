@@ -99,6 +99,10 @@ export class WorkspaceService {
                                     name: 'PASSWORD',
                                     value: 'workspace',
                                 },
+                                {
+                                    name: 'BASE_PATH',
+                                    value: `/api/proxy/workspace/${studentId}`,
+                                },
                             ],
                         },
                     ],
