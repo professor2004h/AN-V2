@@ -66,6 +66,7 @@ const workspaceProxy = createProxyMiddleware({
     target: 'http://localhost:8080',
     changeOrigin: true,
     ws: true, // Enable WebSocket proxying
+    selfHandleResponse: true, // Handle response manually to rewrite HTML
     router: async (req: Request) => {
         try {
             // Extract studentId from URL using originalUrl because req.url is stripped by Express
@@ -93,8 +94,6 @@ const workspaceProxy = createProxyMiddleware({
     },
     pathRewrite: (path: string, req: Request) => {
         // Strip /workspace/:studentId prefix
-        // Input: /workspace/abc-123/some/path
-        // Output: /some/path
         const rewritten = path.replace(/^\/workspace\/[a-zA-Z0-9-]+/, '');
         const finalPath = rewritten || '/';
         logger.debug('Path rewrite', { original: path, rewritten: finalPath });
@@ -103,82 +102,114 @@ const workspaceProxy = createProxyMiddleware({
     on: {
         proxyReq: (proxyReq: any, req: any, res: any) => {
             // Extract studentId to set X-Forwarded-Prefix
-            // This tells code-server the base path so redirects work correctly
             const url = req.originalUrl || req.url || '';
             const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
             const studentIdPart = match ? match[1] : null;
 
             if (studentIdPart) {
-                proxyReq.setHeader('X-Forwarded-Prefix', `/api/proxy/workspace/${studentIdPart}`);
-            }
+                const proxyPath = `/api/proxy/workspace/${studentIdPart}`;
+                proxyReq.setHeader('X-Forwarded-Prefix', proxyPath);
 
-            // Remove the base path prefix for code-server
-            // code-server expects paths without the /api/proxy/workspace/:id prefix
-            logger.debug('Proxy request', {
-                originalUrl: url,
-                method: req.method,
-                headers: Object.keys(req.headers)
-            });
+                // Add other helpful headers
+                proxyReq.setHeader('X-Forwarded-Proto', 'http');
+                proxyReq.setHeader('X-Base-Path', proxyPath);
+            }
         },
         proxyRes: (proxyRes: any, req: any, res: any) => {
-            // Rewrite Location header for redirects to include the proxy prefix
-            if (proxyRes.headers.location) {
-                const url = req.originalUrl || req.url || '';
-                const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
-                const studentIdPart = match ? match[1] : null;
+            const url = req.originalUrl || req.url || '';
+            const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+            const studentIdPart = match ? match[1] : null;
+            const proxyPath = studentIdPart ? `/api/proxy/workspace/${studentIdPart}` : '';
 
-                if (studentIdPart) {
-                    const originalLocation = proxyRes.headers.location;
-                    let location = originalLocation;
-                    const proxyPath = `/api/proxy/workspace/${studentIdPart}`;
+            // Handle redirects (Location header)
+            if (proxyRes.headers.location && studentIdPart) {
+                let location = proxyRes.headers.location;
 
-                    // Handle absolute URLs pointing to internal IP
-                    // Regex to match http(s)://10.x.x.x:8080/path or similar private IPs
-                    const internalUrlRegex = /^https?:\/\/(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.|localhost|127\.)[^/]+(.*)/;
-                    const internalMatch = location.match(internalUrlRegex);
+                // Handle absolute URLs pointing to internal IP
+                const internalUrlRegex = /^https?:\/\/(?:10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|192\.168\.|localhost|127\.)[^/]+(.*)/;
+                const internalMatch = location.match(internalUrlRegex);
 
-                    if (internalMatch) {
-                        // It's an internal absolute URL, extract just the path part
-                        location = internalMatch[1] || '/';
-                        logger.info('Detected internal absolute URL redirect', { original: originalLocation, extracted: location });
-                    }
+                if (internalMatch) {
+                    location = internalMatch[1] || '/';
+                }
 
-                    // If location is relative (starts with /), prepend the proxy path
-                    if (location.startsWith('/')) {
-                        proxyRes.headers.location = `${proxyPath}${location}`;
-                        logger.info('Rewrote redirect location', {
-                            original: originalLocation,
-                            rewritten: proxyRes.headers.location
-                        });
-                    } else {
-                        // If it's still an absolute URL that we didn't catch, log it
-                        logger.warn('Unhandled absolute URL in Location header', { location: originalLocation });
-                    }
+                if (location.startsWith('/')) {
+                    proxyRes.headers.location = `${proxyPath}${location}`;
                 }
             }
 
-            // Rewrite Set-Cookie header paths
-            if (proxyRes.headers['set-cookie']) {
-                const url = req.originalUrl || req.url || '';
-                const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
-                const studentIdPart = match ? match[1] : null;
+            // Handle Cookies (Set-Cookie header)
+            if (proxyRes.headers['set-cookie'] && studentIdPart) {
+                const cookies = Array.isArray(proxyRes.headers['set-cookie'])
+                    ? proxyRes.headers['set-cookie']
+                    : [proxyRes.headers['set-cookie']];
 
-                if (studentIdPart) {
-                    const cookies = Array.isArray(proxyRes.headers['set-cookie'])
-                        ? proxyRes.headers['set-cookie']
-                        : [proxyRes.headers['set-cookie']];
+                proxyRes.headers['set-cookie'] = cookies.map((cookie: string) => {
+                    return cookie.replace(/Path=\//gi, `Path=${proxyPath}/`);
+                });
+            }
 
-                    proxyRes.headers['set-cookie'] = cookies.map((cookie: string) => {
-                        // Rewrite Path=/ to Path=/api/proxy/workspace/:studentId/
-                        return cookie.replace(/Path=\//gi, `Path=/api/proxy/workspace/${studentIdPart}/`);
+            // Check if response is HTML
+            const contentType = proxyRes.headers['content-type'] || '';
+            const isHtml = contentType.includes('text/html');
+
+            // Copy status code
+            res.status(proxyRes.statusCode);
+
+            // Copy headers
+            Object.keys(proxyRes.headers).forEach((key: string) => {
+                if (key !== 'content-length' && key !== 'transfer-encoding') {
+                    res.setHeader(key, proxyRes.headers[key]);
+                }
+            });
+
+            // If not HTML or no student ID, pipe directly
+            if (!isHtml || !studentIdPart) {
+                proxyRes.pipe(res);
+                return;
+            }
+
+            // If HTML, buffer and rewrite
+            let body = Buffer.from([]);
+
+            proxyRes.on('data', (chunk: Buffer) => {
+                body = Buffer.concat([body, chunk]);
+            });
+
+            proxyRes.on('end', () => {
+                try {
+                    let bodyStr = body.toString('utf8');
+
+                    // Rewrite JavaScript redirects
+                    // 1. window.location = "/" -> window.location = "/api/proxy/workspace/:id/"
+                    // 2. window.location.href = "/" -> window.location.href = "/api/proxy/workspace/:id/"
+                    // 3. location.replace("/") -> location.replace("/api/proxy/workspace/:id/")
+                    // 4. <meta http-equiv="refresh" content="0;url=/"> -> ... url=/api/proxy/workspace/:id/
+                    // 5. <base href="/"> -> <base href="/api/proxy/workspace/:id/">
+
+                    const rewrittenBody = bodyStr
+                        .replace(/window\.location\s*=\s*["']\/["']/g, `window.location="${proxyPath}/"`)
+                        .replace(/window\.location\.href\s*=\s*["']\/["']/g, `window.location.href="${proxyPath}/"`)
+                        .replace(/location\.replace\s*\(\s*["']\/["']\s*\)/g, `location.replace("${proxyPath}/")`)
+                        .replace(/location\.href\s*=\s*["']\/["']/g, `location.href="${proxyPath}/"`)
+                        .replace(/<meta\s+http-equiv=["']refresh["']\s+content=["']([^"']*)url=\/["']/gi, `<meta http-equiv="refresh" content="$1url=${proxyPath}/"`)
+                        .replace(/<base\s+href=["']\/["']/gi, `<base href="${proxyPath}/"`)
+                        // Also catch specific code-server login redirect pattern if known
+                        .replace(/"\/login"/g, `"${proxyPath}/login"`)
+                        .replace(/'\/login'/g, `'${proxyPath}/login'`);
+
+                    res.setHeader('content-length', Buffer.byteLength(rewrittenBody));
+                    res.send(rewrittenBody);
+
+                    logger.debug('Rewrote HTML response', {
+                        studentId: studentIdPart,
+                        originalLength: bodyStr.length,
+                        newLength: rewrittenBody.length
                     });
+                } catch (e) {
+                    logger.error('Error rewriting HTML response', e);
+                    res.send(body); // Fallback to original body
                 }
-            }
-
-            logger.debug('Proxy response', {
-                statusCode: proxyRes.statusCode,
-                headers: Object.keys(proxyRes.headers),
-                location: proxyRes.headers.location
             });
         },
         error: (err: any, req: any, res: any) => {

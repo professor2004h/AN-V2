@@ -68,21 +68,7 @@ chown -R coder:coder /home/coder/.config
 # The BASE_PATH environment variable is set by the backend during task creation
 # Format: /api/proxy/workspace/:studentId (NO trailing slash)
 # This tells code-server which subpath it's being served from
-# Construct arguments array
-ARGS=()
-
-# Add base-path if set
-if [ -n "${BASE_PATH}" ]; then
-    echo "DEBUG: Adding base-path flag: ${BASE_PATH}"
-    ARGS+=(--base-path "${BASE_PATH}")
-else
-    echo "WARNING: BASE_PATH not set, starting without it"
-fi
-
-# Add workspace path
-ARGS+=("${WORKSPACE_PATH}")
-
-echo "DEBUG: Executing code-server with args: ${ARGS[*]}"
-
-# Execute code-server
-exec gosu coder /usr/bin/code-server "${ARGS[@]}"
+# Start code-server as coder user with workspace path only
+# We rely on the backend proxy to handle path rewriting
+echo "Starting code-server..."
+exec gosu coder /usr/bin/code-server "${WORKSPACE_PATH}"
