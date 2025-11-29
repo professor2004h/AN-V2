@@ -29,8 +29,14 @@ const app = express();
 // Trust proxy (required for ALB and rate limiting)
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Security middleware - disable CSP for proxy routes (code-server has its own security)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/proxy')) {
+    // Skip helmet for proxy routes to avoid CSP conflicts with code-server
+    return next();
+  }
+  helmet()(req, res, next);
+});
 // CORS configuration
 const allowedOrigins = [
   config.frontendUrl,
