@@ -31,8 +31,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Redirect to login
-      if (typeof window !== 'undefined') {
+      // Don't redirect if already on signin page to avoid infinite loops
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth/signin')) {
         window.location.href = '/auth/signin'
       }
     }

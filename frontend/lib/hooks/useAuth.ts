@@ -17,8 +17,13 @@ export function useAuth() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return null
 
-      const response = await authApi.getMe()
-      return response.data as Profile
+      try {
+        const response = await authApi.getMe()
+        return response.data as Profile
+      } catch (error) {
+        // If getMe fails, return null instead of redirecting
+        return null
+      }
     },
     retry: false,
   })
