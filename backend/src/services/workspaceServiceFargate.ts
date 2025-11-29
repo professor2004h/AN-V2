@@ -87,6 +87,11 @@ export class WorkspaceService {
                     containerOverrides: [
                         {
                             name: 'code-server',
+                            command: [
+                                '/bin/sh',
+                                '-c',
+                                `code-server --auth none --bind-addr 0.0.0.0:8080 /workspaces/${studentId}`
+                            ],
                             environment: [
                                 {
                                     name: 'STUDENT_ID',
@@ -97,8 +102,16 @@ export class WorkspaceService {
                                     value: `/workspaces/${studentId}`,
                                 },
                                 {
-                                    name: 'PASSWORD',
-                                    value: 'workspace',
+                                    name: 'AUTH',
+                                    value: 'none',
+                                },
+                                {
+                                    name: 'CS_DISABLE_CSRF_PROTECTION',
+                                    value: 'true',
+                                },
+                                {
+                                    name: 'PROXY_DOMAIN',
+                                    value: 'ecombinators.com',
                                 },
                                 {
                                     name: 'BASE_PATH',
@@ -183,8 +196,8 @@ export class WorkspaceService {
             // No need to register with ALB anymore as we use backend proxy
             // await this.registerWithTargetGroup(privateIp, studentId);
 
-            // Use Backend Proxy URL with custom domain
-            const workspaceUrl = `http://${this.DOMAIN}/api/proxy/workspace/${studentId}`;
+            // Use Backend Proxy URL with custom domain (HTTPS)
+            const workspaceUrl = `https://${this.DOMAIN}/api/proxy/workspace/${studentId}`;
 
             // Update status to running
             sendProgress('Finalizing workspace...', 95);
