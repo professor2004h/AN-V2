@@ -1,7 +1,11 @@
 import axios from 'axios'
 import { supabase } from './supabase'
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
+// Use relative URL in production (ALB routes /api/* to backend)
+// Use localhost in development
+const API_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? '' // Empty string = relative URL, works with ALB routing
+  : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001')
 
 // Create axios instance
 export const api = axios.create({

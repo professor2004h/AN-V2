@@ -54,8 +54,13 @@ export default function WorkspacePage() {
       }
 
       // Use fetch for SSE with auth headers
+      // Use relative URL in production (ALB routes /api/* to backend)
+      const backendUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+        ? '' // Empty string = relative URL, works with ALB routing
+        : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001')
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api/workspaces/provision-stream`,
+        `${backendUrl}/api/workspaces/provision-stream`,
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
