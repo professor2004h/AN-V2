@@ -11,6 +11,8 @@ const nextConfig = {
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
   },
   output: 'standalone',
+  // Disable compression - let ALB handle it to avoid double compression
+  compress: false,
 }
 
 module.exports = nextConfig
