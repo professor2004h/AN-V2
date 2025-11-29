@@ -62,44 +62,77 @@ async function verifyWorkspaceAccess(req: any, studentId: string): Promise<boole
     }
 }
 
-// Proxy middleware
-const workspaceProxy = createProxyMiddleware({
+// Router function to get target URL - shared between proxies
+async function getProxyTarget(req: Request): Promise<string | undefined> {
+    try {
+        // Extract studentId from URL using originalUrl because req.url is stripped by Express
+        const url = req.originalUrl || '';
+        const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+        const studentIdPart = match ? match[1] : null;
+
+        if (!studentIdPart) {
+            logger.error('No studentId found in proxy path', { url });
+            return undefined;
+        }
+
+        const ip = await getWorkspaceIp(studentIdPart);
+        if (!ip) {
+            logger.error('No IP found for workspace', { studentId: studentIdPart });
+            return undefined;
+        }
+
+        logger.info('Proxying to workspace', { studentId: studentIdPart, ip, port: 8080 });
+        return `http://${ip}:8080`;
+    } catch (error) {
+        logger.error('Proxy router error:', error);
+        return undefined;
+    }
+}
+
+// Path rewrite function - shared between proxies
+function rewritePath(path: string, req: Request): string {
+    // Strip /workspace/:studentId prefix
+    const rewritten = path.replace(/^\/workspace\/[a-zA-Z0-9-]+/, '');
+    const finalPath = rewritten || '/';
+    logger.debug('Path rewrite', { original: path, rewritten: finalPath });
+    return finalPath;
+}
+
+// WebSocket proxy - no selfHandleResponse needed
+const wsProxy = createProxyMiddleware({
     target: 'http://localhost:8080',
     changeOrigin: true,
-    ws: true, // Enable WebSocket proxying
-    selfHandleResponse: true, // Handle response manually to rewrite HTML
-    router: async (req: Request) => {
-        try {
-            // Extract studentId from URL using originalUrl because req.url is stripped by Express
-            const url = req.originalUrl || '';
+    ws: true,
+    router: getProxyTarget,
+    pathRewrite: rewritePath,
+    on: {
+        proxyReq: (proxyReq: any, req: any, res: any) => {
+            // Extract studentId to set X-Forwarded-Prefix
+            const url = req.originalUrl || req.url || '';
             const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
             const studentIdPart = match ? match[1] : null;
 
-            if (!studentIdPart) {
-                logger.error('No studentId found in proxy path', { url });
-                return undefined;
+            if (studentIdPart) {
+                const proxyPath = `/api/proxy/workspace/${studentIdPart}`;
+                proxyReq.setHeader('X-Forwarded-Prefix', proxyPath);
+                proxyReq.setHeader('X-Forwarded-Proto', 'https');
+                proxyReq.setHeader('X-Base-Path', proxyPath);
             }
-
-            const ip = await getWorkspaceIp(studentIdPart);
-            if (!ip) {
-                logger.error('No IP found for workspace', { studentId: studentIdPart });
-                return undefined;
-            }
-
-            logger.info('Proxying to workspace', { studentId: studentIdPart, ip, port: 8080 });
-            return `http://${ip}:8080`;
-        } catch (error) {
-            logger.error('Proxy router error:', error);
-            return undefined;
+        },
+        error: (err: any, req: any, res: any) => {
+            logger.error('WebSocket proxy error:', { error: err.message, url: req.url });
         }
-    },
-    pathRewrite: (path: string, req: Request) => {
-        // Strip /workspace/:studentId prefix
-        const rewritten = path.replace(/^\/workspace\/[a-zA-Z0-9-]+/, '');
-        const finalPath = rewritten || '/';
-        logger.debug('Path rewrite', { original: path, rewritten: finalPath });
-        return finalPath;
-    },
+    }
+});
+
+// HTTP proxy - with selfHandleResponse to rewrite HTML
+const workspaceProxy = createProxyMiddleware({
+    target: 'http://localhost:8080',
+    changeOrigin: true,
+    ws: false, // HTTP only - WebSocket handled by wsProxy
+    selfHandleResponse: true, // Handle response manually to rewrite HTML
+    router: getProxyTarget,
+    pathRewrite: rewritePath,
     on: {
         proxyReq: (proxyReq: any, req: any, res: any) => {
             // Extract studentId to set X-Forwarded-Prefix
@@ -112,7 +145,7 @@ const workspaceProxy = createProxyMiddleware({
                 proxyReq.setHeader('X-Forwarded-Prefix', proxyPath);
 
                 // Add other helpful headers
-                proxyReq.setHeader('X-Forwarded-Proto', 'http');
+                proxyReq.setHeader('X-Forwarded-Proto', 'https');
                 proxyReq.setHeader('X-Base-Path', proxyPath);
             }
         },
@@ -300,8 +333,22 @@ async function verifyAccess(req: Request, res: Response, next: NextFunction) {
     }
 }
 
+// Middleware to route WebSocket vs HTTP requests
+function proxyMiddleware(req: Request, res: Response, next: NextFunction) {
+    // Check if this is a WebSocket upgrade request
+    const upgrade = req.headers['upgrade'];
+    if (upgrade && upgrade.toLowerCase() === 'websocket') {
+        // Use WebSocket proxy (no selfHandleResponse)
+        return wsProxy(req, res, next);
+    }
+    // Use HTTP proxy (with selfHandleResponse for HTML rewriting)
+    return workspaceProxy(req, res, next);
+}
+
 // Mount proxy WITHOUT authentication requirement
 // code-server will handle its own password authentication
-router.use('/workspace/:studentId', verifyAccess, workspaceProxy);
+router.use('/workspace/:studentId', verifyAccess, proxyMiddleware);
 
+// Export the wsProxy for server-level WebSocket upgrade handling
+export { wsProxy };
 export default router;

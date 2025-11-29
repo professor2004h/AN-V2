@@ -21,7 +21,7 @@ import messageRoutes from './routes/message';
 import workspaceRoutes from './routes/workspace';
 import analyticsRoutes from './routes/analytics';
 import setupRoutes from './routes/setup';
-import proxyRoutes from './routes/proxy';
+import proxyRoutes, { wsProxy } from './routes/proxy';
 import { workspaceService } from './services/workspaceService';
 
 const app = express();
@@ -118,6 +118,16 @@ const server = app.listen(config.port, () => {
   setInterval(() => {
     workspaceService.cleanupWorkspaces();
   }, 60 * 1000);
+});
+
+// Attach WebSocket upgrade handler for workspace proxy
+// This handles WebSocket connections at the server level before Express
+server.on('upgrade', (req, socket, head) => {
+  // Only handle workspace proxy WebSocket requests
+  if (req.url && req.url.includes('/api/proxy/workspace/')) {
+    logger.info('WebSocket upgrade request', { url: req.url });
+    wsProxy.upgrade(req, socket as any, head);
+  }
 });
 
 // Graceful shutdown
