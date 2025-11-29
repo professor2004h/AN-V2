@@ -158,9 +158,14 @@ const workspaceProxy = createProxyMiddleware({
             // Copy status code
             res.status(proxyRes.statusCode);
 
-            // Copy headers (but remove content-encoding since we'll decompress)
+            // Copy headers (but remove content-encoding since we'll decompress, and remove CSP to allow inline scripts)
             Object.keys(proxyRes.headers).forEach((key: string) => {
-                if (key !== 'content-length' && key !== 'transfer-encoding' && key !== 'content-encoding') {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey !== 'content-length' &&
+                    lowerKey !== 'transfer-encoding' &&
+                    lowerKey !== 'content-encoding' &&
+                    lowerKey !== 'content-security-policy' &&
+                    lowerKey !== 'content-security-policy-report-only') {
                     res.setHeader(key, proxyRes.headers[key]);
                 }
             });
