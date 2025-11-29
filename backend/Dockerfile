@@ -18,8 +18,8 @@ WORKDIR /app
 
 ENV NODE_ENV production
 
-# Install Docker CLI for workspace management
-RUN apk add --no-cache docker-cli
+# Install curl for health checks and Docker CLI for workspace management
+RUN apk add --no-cache curl docker-cli
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 expressjs
