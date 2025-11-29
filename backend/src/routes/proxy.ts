@@ -63,11 +63,14 @@ async function verifyWorkspaceAccess(req: any, studentId: string): Promise<boole
 }
 
 // Router function to get target URL - shared between proxies
-async function getProxyTarget(req: Request): Promise<string | undefined> {
+async function getProxyTarget(req: any): Promise<string | undefined> {
     try {
-        // Extract studentId from URL using originalUrl because req.url is stripped by Express
-        const url = req.originalUrl || '';
-        const match = url.match(/\/workspace\/([a-zA-Z0-9-]+)/);
+        // Extract studentId from URL - use originalUrl for Express requests, url for raw upgrade requests
+        const url = req.originalUrl || req.url || '';
+        logger.info('getProxyTarget called', { originalUrl: req.originalUrl, url: req.url, finalUrl: url });
+
+        // Match both /api/proxy/workspace/:id and /workspace/:id patterns
+        const match = url.match(/\/(?:api\/proxy\/)?workspace\/([a-zA-Z0-9-]+)/);
         const studentIdPart = match ? match[1] : null;
 
         if (!studentIdPart) {
@@ -90,9 +93,14 @@ async function getProxyTarget(req: Request): Promise<string | undefined> {
 }
 
 // Path rewrite function - shared between proxies
-function rewritePath(path: string, req: Request): string {
-    // Strip /workspace/:studentId prefix
-    const rewritten = path.replace(/^\/workspace\/[a-zA-Z0-9-]+/, '');
+function rewritePath(path: string, req: any): string {
+    // Strip /api/proxy/workspace/:studentId prefix (for server-level upgrade requests)
+    // or /workspace/:studentId prefix (for Express middleware requests)
+    let rewritten = path.replace(/^\/api\/proxy\/workspace\/[a-zA-Z0-9-]+/, '');
+    if (rewritten === path) {
+        // Try the Express-style path if first pattern didn't match
+        rewritten = path.replace(/^\/workspace\/[a-zA-Z0-9-]+/, '');
+    }
     const finalPath = rewritten || '/';
     logger.debug('Path rewrite', { original: path, rewritten: finalPath });
     return finalPath;
