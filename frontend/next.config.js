@@ -13,6 +13,30 @@ const nextConfig = {
   output: 'standalone',
   // Disable compression - let ALB handle it to avoid double compression
   compress: false,
+  // Prevent browser caching of HTML pages to avoid stale chunk references
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
+          },
+        ],
+      },
+      {
+        // Allow caching of static assets (they have hashes in filenames)
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig
