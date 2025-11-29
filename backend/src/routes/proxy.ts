@@ -146,7 +146,13 @@ const workspaceProxy = createProxyMiddleware({
                     : [proxyRes.headers['set-cookie']];
 
                 proxyRes.headers['set-cookie'] = cookies.map((cookie: string) => {
-                    return cookie.replace(/Path=\//gi, `Path=${proxyPath}/`);
+                    // Rewrite Path to proxy path
+                    let modifiedCookie = cookie.replace(/Path=\//gi, `Path=${proxyPath}/`);
+                    // Add Secure attribute for HTTPS and change SameSite to None for cross-origin
+                    if (!modifiedCookie.includes('Secure')) {
+                        modifiedCookie = modifiedCookie.replace(/SameSite=Lax/gi, 'SameSite=None; Secure');
+                    }
+                    return modifiedCookie;
                 });
             }
 
