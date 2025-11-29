@@ -4,6 +4,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import { workspaceService } from '../services/workspaceService';
 import { supabaseAdmin } from '../lib/supabase';
 import { logger } from '../lib/logger';
+import * as zlib from 'zlib';
 
 const router = Router();
 
@@ -152,24 +153,29 @@ const workspaceProxy = createProxyMiddleware({
             // Check if response is HTML
             const contentType = proxyRes.headers['content-type'] || '';
             const isHtml = contentType.includes('text/html');
+            const contentEncoding = proxyRes.headers['content-encoding'] || '';
 
             // Copy status code
             res.status(proxyRes.statusCode);
 
-            // Copy headers
+            // Copy headers (but remove content-encoding since we'll decompress)
             Object.keys(proxyRes.headers).forEach((key: string) => {
-                if (key !== 'content-length' && key !== 'transfer-encoding') {
+                if (key !== 'content-length' && key !== 'transfer-encoding' && key !== 'content-encoding') {
                     res.setHeader(key, proxyRes.headers[key]);
                 }
             });
 
-            // If not HTML or no student ID, pipe directly
+            // If not HTML or no student ID, pipe directly (but handle compression)
             if (!isHtml || !studentIdPart) {
+                // For non-HTML, just pipe through with original encoding
+                if (contentEncoding) {
+                    res.setHeader('content-encoding', contentEncoding);
+                }
                 proxyRes.pipe(res);
                 return;
             }
 
-            // If HTML, buffer and rewrite
+            // If HTML, buffer and rewrite (decompress if needed)
             let body = Buffer.from([]);
 
             proxyRes.on('data', (chunk: Buffer) => {
@@ -178,15 +184,21 @@ const workspaceProxy = createProxyMiddleware({
 
             proxyRes.on('end', () => {
                 try {
-                    let bodyStr = body.toString('utf8');
+                    // Decompress if needed
+                    let decompressedBody: Buffer;
+                    if (contentEncoding === 'gzip') {
+                        decompressedBody = zlib.gunzipSync(body);
+                    } else if (contentEncoding === 'deflate') {
+                        decompressedBody = zlib.inflateSync(body);
+                    } else if (contentEncoding === 'br') {
+                        decompressedBody = zlib.brotliDecompressSync(body);
+                    } else {
+                        decompressedBody = body;
+                    }
+
+                    let bodyStr = decompressedBody.toString('utf8');
 
                     // Rewrite JavaScript redirects
-                    // 1. window.location = "/" -> window.location = "/api/proxy/workspace/:id/"
-                    // 2. window.location.href = "/" -> window.location.href = "/api/proxy/workspace/:id/"
-                    // 3. location.replace("/") -> location.replace("/api/proxy/workspace/:id/")
-                    // 4. <meta http-equiv="refresh" content="0;url=/"> -> ... url=/api/proxy/workspace/:id/
-                    // 5. <base href="/"> -> <base href="/api/proxy/workspace/:id/">
-
                     const rewrittenBody = bodyStr
                         .replace(/window\.location\s*=\s*["']\/["']/g, `window.location="${proxyPath}/"`)
                         .replace(/window\.location\.href\s*=\s*["']\/["']/g, `window.location.href="${proxyPath}/"`)
@@ -194,21 +206,26 @@ const workspaceProxy = createProxyMiddleware({
                         .replace(/location\.href\s*=\s*["']\/["']/g, `location.href="${proxyPath}/"`)
                         .replace(/<meta\s+http-equiv=["']refresh["']\s+content=["']([^"']*)url=\/["']/gi, `<meta http-equiv="refresh" content="$1url=${proxyPath}/"`)
                         .replace(/<base\s+href=["']\/["']/gi, `<base href="${proxyPath}/"`)
-                        // Also catch specific code-server login redirect pattern if known
                         .replace(/"\/login"/g, `"${proxyPath}/login"`)
                         .replace(/'\/login'/g, `'${proxyPath}/login'`);
 
+                    // Send uncompressed response (ALB will compress if needed)
                     res.setHeader('content-length', Buffer.byteLength(rewrittenBody));
                     res.send(rewrittenBody);
 
                     logger.debug('Rewrote HTML response', {
                         studentId: studentIdPart,
                         originalLength: bodyStr.length,
-                        newLength: rewrittenBody.length
+                        newLength: rewrittenBody.length,
+                        wasCompressed: !!contentEncoding
                     });
                 } catch (e) {
                     logger.error('Error rewriting HTML response', e);
-                    res.send(body); // Fallback to original body
+                    // If decompression fails, try to send original
+                    if (contentEncoding) {
+                        res.setHeader('content-encoding', contentEncoding);
+                    }
+                    res.send(body);
                 }
             });
         },
