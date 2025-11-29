@@ -146,11 +146,26 @@ const workspaceProxy = createProxyMiddleware({
                     : [proxyRes.headers['set-cookie']];
 
                 proxyRes.headers['set-cookie'] = cookies.map((cookie: string) => {
-                    // Rewrite Path to proxy path
-                    let modifiedCookie = cookie.replace(/Path=\//gi, `Path=${proxyPath}/`);
+                    let modifiedCookie = cookie;
+
+                    // Extract current path from cookie
+                    const pathMatch = cookie.match(/Path=([^;]+)/i);
+                    const currentPath = pathMatch ? pathMatch[1] : '/';
+
+                    // Only rewrite if path doesn't already contain the proxy path
+                    // This prevents double-path issues when browser sends href
+                    if (!currentPath.includes(proxyPath)) {
+                        // Rewrite Path=/ to proxy path
+                        modifiedCookie = cookie.replace(/Path=\//gi, `Path=${proxyPath}/`);
+                    }
+
                     // Add Secure attribute for HTTPS and change SameSite to None for cross-origin
                     if (!modifiedCookie.includes('Secure')) {
                         modifiedCookie = modifiedCookie.replace(/SameSite=Lax/gi, 'SameSite=None; Secure');
+                    }
+                    // If no SameSite at all, add it with Secure
+                    if (!modifiedCookie.includes('SameSite')) {
+                        modifiedCookie = modifiedCookie + '; SameSite=None; Secure';
                     }
                     return modifiedCookie;
                 });
