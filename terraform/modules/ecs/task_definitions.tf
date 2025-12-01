@@ -108,6 +108,14 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name      = "JWT_SECRET"
           valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:apranova/production/supabase-74motf:JWT_SECRET::"
+        },
+        {
+          name      = "STRIPE_SECRET_KEY"
+          valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:apranova/production/supabase-74motf:STRIPE_SECRET_KEY::"
+        },
+        {
+          name      = "STRIPE_PUBLISHABLE_KEY"
+          valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:apranova/production/supabase-74motf:STRIPE_PUBLISHABLE_KEY::"
         }
       ]
 
