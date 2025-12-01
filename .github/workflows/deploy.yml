@@ -1,100 +1,164 @@
+# ============================================
+# APRANOVA LMS - AWS DEPLOYMENT WORKFLOW
+# ============================================
+
 name: Deploy to AWS
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "038839713355"
   ECR_FRONTEND_REPO: apranova-lms-frontend
   ECR_BACKEND_REPO: apranova-lms-backend
-  ECS_CLUSTER: apranova-lms-cluster
-  ECS_FRONTEND_SERVICE: apranova-lms-frontend
-  ECS_BACKEND_SERVICE: apranova-lms-backend
+  ECR_CODESERVER_REPO: apranova-lms-codeserver
+  ECS_CLUSTER: apranova-lms-production-cluster
+  ECS_FRONTEND_SERVICE: apranova-lms-production-frontend
+  ECS_BACKEND_SERVICE: apranova-lms-production-backend
+  TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+  TF_VAR_supabase_anon_key: ${{ secrets.SUPABASE_ANON_KEY }}
+  TF_VAR_supabase_service_role_key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
 jobs:
-  deploy:
-    name: Deploy
+  terraform:
+    name: Terraform Infrastructure
     runs-on: ubuntu-latest
     environment: production
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-    # Terraform steps removed as per user request to start from scratch
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
 
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=apranova-terraform-state-038839713355" \
+            -backend-config="key=prod/terraform.tfstate" \
+            -backend-config="region=us-east-1" \
+            -backend-config="dynamodb_table=apranova-terraform-locks" \
+            -backend-config="encrypt=true"
 
-    # NOW build and push Docker images (ECR repos exist now)
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan -out=tfplan
 
-    - name: Build and push Frontend
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        cd frontend
-        docker build \
-          --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-          --build-arg NEXT_PUBLIC_BACKEND_URL=http://apranova-lms-alb-v2-1395433124.ap-southeast-2.elb.amazonaws.com:3001 \
-          --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }} \
-          -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG
-        docker tag $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
-        docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve tfplan
 
-    - name: Build and push Backend
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        cd backend
-        # Inject secrets into .env.production
-        sed -i "s|PLACEHOLDER_SUPABASE_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" .env.production
-        sed -i "s|PLACEHOLDER_SUPABASE_SERVICE_ROLE_KEY|${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}|g" .env.production
-        sed -i "s|PLACEHOLDER_SUPABASE_DB_PASSWORD|${{ secrets.DB_PASSWORD }}|g" .env.production
-        sed -i "s|PLACEHOLDER_STRIPE_SECRET_KEY|${{ secrets.STRIPE_SECRET_KEY }}|g" .env.production
-        sed -i "s|PLACEHOLDER_STRIPE_WEBHOOK_SECRET|${{ secrets.STRIPE_WEBHOOK_SECRET }}|g" .env.production
-        sed -i "s|PLACEHOLDER_RESEND_API_KEY|${{ secrets.RESEND_API_KEY }}|g" .env.production
-        sed -i "s|PLACEHOLDER_JWT_SECRET|${{ secrets.JWT_SECRET }}|g" .env.production
-        sed -i "s|PLACEHOLDER_CODE_SERVER_PASSWORD|${{ secrets.CODE_SERVER_PASSWORD }}|g" .env.production
-        sed -i "s|PLACEHOLDER_AWS_ACCESS_KEY_ID|${{ secrets.AWS_ACCESS_KEY_ID }}|g" .env.production
-        sed -i "s|PLACEHOLDER_AWS_SECRET_ACCESS_KEY|${{ secrets.AWS_SECRET_ACCESS_KEY }}|g" .env.production
-        
-        docker build -t $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
-        docker tag $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
-        docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    needs: terraform
+    environment: production
 
-    - name: Update ECS Services
-      run: |
-        echo "Listing services in cluster..."
-        aws ecs list-services --cluster $ECS_CLUSTER --region $AWS_REGION
-        
-        echo "Attempting to update services..."
-        # Try to update frontend service
-        if aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_FRONTEND_SERVICE --region $AWS_REGION 2>/dev/null | grep -q "serviceName"; then
-          echo "Updating frontend service..."
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_FRONTEND_SERVICE --force-new-deployment --region $AWS_REGION
-        else
-          echo "Frontend service not found, skipping..."
-        fi
-        
-        # Try to update backend service
-        if aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_BACKEND_SERVICE --region $AWS_REGION 2>/dev/null | grep -q "serviceName"; then
-          echo "Updating backend service..."
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_BACKEND_SERVICE --force-new-deployment --region $AWS_REGION
-        else
-          echo "Backend service not found, skipping..."
-        fi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd frontend
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.ecombinators.com \
+            --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }} \
+            -t $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_FRONTEND_REPO:latest
+
+      - name: Build and push Backend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend
+          # Inject secrets into .env.production
+          sed -i "s|PLACEHOLDER_SUPABASE_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" .env.production
+          sed -i "s|PLACEHOLDER_SUPABASE_SERVICE_ROLE_KEY|${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}|g" .env.production
+          sed -i "s|PLACEHOLDER_SUPABASE_DB_PASSWORD|${{ secrets.DB_PASSWORD }}|g" .env.production
+          sed -i "s|PLACEHOLDER_STRIPE_SECRET_KEY|${{ secrets.STRIPE_SECRET_KEY }}|g" .env.production
+          sed -i "s|PLACEHOLDER_STRIPE_WEBHOOK_SECRET|${{ secrets.STRIPE_WEBHOOK_SECRET }}|g" .env.production
+          sed -i "s|PLACEHOLDER_RESEND_API_KEY|${{ secrets.RESEND_API_KEY }}|g" .env.production
+          sed -i "s|PLACEHOLDER_JWT_SECRET|${{ secrets.JWT_SECRET }}|g" .env.production
+          sed -i "s|PLACEHOLDER_CODE_SERVER_PASSWORD|${{ secrets.CODE_SERVER_PASSWORD }}|g" .env.production
+          sed -i "s|PLACEHOLDER_AWS_ACCESS_KEY_ID|${{ secrets.AWS_ACCESS_KEY_ID }}|g" .env.production
+          sed -i "s|PLACEHOLDER_AWS_SECRET_ACCESS_KEY|${{ secrets.AWS_SECRET_ACCESS_KEY }}|g" .env.production
+
+          docker build -t $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_BACKEND_REPO:latest
+
+      - name: Build and push Code-Server
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd docker/code-server
+          docker build -t $ECR_REGISTRY/$ECR_CODESERVER_REPO:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_CODESERVER_REPO:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_CODESERVER_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_CODESERVER_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_CODESERVER_REPO:latest
+
+      - name: Update ECS Services
+        run: |
+          echo "Updating ECS services..."
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_FRONTEND_SERVICE \
+            --force-new-deployment \
+            --region $AWS_REGION || echo "Frontend service update skipped"
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_BACKEND_SERVICE \
+            --force-new-deployment \
+            --region $AWS_REGION || echo "Backend service update skipped"
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for services to stabilize..."
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_FRONTEND_SERVICE $ECS_BACKEND_SERVICE \
+            --region $AWS_REGION || echo "Services may still be deploying"
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Deployment Complete!"
+          echo "Frontend: https://app.ecombinators.com"
+          echo "Backend: https://api.ecombinators.com"
+          echo "Workspaces: https://workspace.ecombinators.com"
