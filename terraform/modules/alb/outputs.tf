@@ -32,9 +32,9 @@ output "alb_security_group_id" {
   value       = aws_security_group.alb.id
 }
 
-output "https_listener_arn" {
-  description = "HTTPS listener ARN"
-  value       = aws_lb_listener.https.arn
+output "http_listener_arn" {
+  description = "HTTP listener ARN"
+  value       = aws_lb_listener.http.arn
 }
 
 output "frontend_target_group_arn" {
@@ -52,8 +52,9 @@ output "codeserver_target_group_arn" {
   value       = aws_lb_target_group.codeserver.arn
 }
 
-output "certificate_arn" {
-  description = "ACM certificate ARN"
-  value       = aws_acm_certificate.main.arn
-}
+# Certificate ARN - commented out until SSL is configured
+# output "certificate_arn" {
+#   description = "ACM certificate ARN"
+#   value       = aws_acm_certificate.main.arn
+# }
 
