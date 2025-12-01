@@ -55,7 +55,7 @@ resource "aws_lb_listener_rule" "workspace" {
   tags = var.tags
 }
 
-# Listener Rule: App subdomain
+# Listener Rule: Root domain + App subdomain
 resource "aws_lb_listener_rule" "app" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 200
@@ -67,7 +67,7 @@ resource "aws_lb_listener_rule" "app" {
 
   condition {
     host_header {
-      values = ["app.${var.domain_name}"]
+      values = [var.domain_name, "app.${var.domain_name}", "www.${var.domain_name}"]
     }
   }
 
@@ -75,6 +75,33 @@ resource "aws_lb_listener_rule" "app" {
 }
 
 # Route 53 Records
+
+# Root domain (apex)
+resource "aws_route53_record" "root" {
+  zone_id = var.hosted_zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.main.dns_name
+    zone_id                = aws_lb.main.zone_id
+    evaluate_target_health = true
+  }
+}
+
+# WWW subdomain
+resource "aws_route53_record" "www" {
+  zone_id = var.hosted_zone_id
+  name    = "www.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.main.dns_name
+    zone_id                = aws_lb.main.zone_id
+    evaluate_target_health = true
+  }
+}
+
 resource "aws_route53_record" "app" {
   zone_id = var.hosted_zone_id
   name    = "app.${var.domain_name}"
