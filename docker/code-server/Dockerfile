@@ -41,14 +41,14 @@ RUN npm install -g \
     create-react-app \
     next
 
-# Install VS Code extensions
-RUN code-server --install-extension ms-python.python \
-    && code-server --install-extension ms-python.vscode-pylance \
-    && code-server --install-extension dbaeumer.vscode-eslint \
-    && code-server --install-extension esbenp.prettier-vscode \
-    && code-server --install-extension bradlc.vscode-tailwindcss \
-    && code-server --install-extension ms-azuretools.vscode-docker \
-    && code-server --install-extension eamodio.gitlens
+# Install VS Code extensions (only open-source extensions available in code-server)
+RUN code-server --install-extension ms-python.python || true \
+    && code-server --install-extension dbaeumer.vscode-eslint || true \
+    && code-server --install-extension esbenp.prettier-vscode || true \
+    && code-server --install-extension bradlc.vscode-tailwindcss || true \
+    && code-server --install-extension eamodio.gitlens || true \
+    && code-server --install-extension formulahendry.auto-close-tag || true \
+    && code-server --install-extension formulahendry.auto-rename-tag || true
 
 # Set working directory
 WORKDIR /home/coder/project
