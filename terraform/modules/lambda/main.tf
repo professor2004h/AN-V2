@@ -56,7 +56,8 @@ resource "aws_iam_role_policy" "lambda" {
           "ecs:StopTask",
           "ecs:DescribeTasks",
           "ecs:ListTasks",
-          "ecs:UpdateService"
+          "ecs:UpdateService",
+          "ecs:TagResource"
         ]
         Resource = "*"
       },
