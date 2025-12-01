@@ -164,3 +164,19 @@ module "cloudwatch" {
   tags = var.tags
 }
 
+# ============================================
+# REDIS MODULE (Session Management)
+# ============================================
+module "redis" {
+  source = "./modules/redis"
+
+  project_name             = var.project_name
+  environment              = var.environment
+  vpc_id                   = module.vpc.vpc_id
+  private_subnets          = module.vpc.private_subnet_ids
+  ecs_security_group_id    = module.ecs.ecs_security_group_id
+  lambda_security_group_id = module.lambda.lambda_security_group_id
+
+  tags = var.tags
+}
+
