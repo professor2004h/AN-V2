@@ -13,13 +13,14 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     python3 \
     python3-pip \
+    python3-venv \
     nodejs \
     npm \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages for Data Professional track
-RUN pip3 install --no-cache-dir \
+# Install Python packages for Data Professional track (using --break-system-packages for container)
+RUN pip3 install --no-cache-dir --break-system-packages \
     pandas \
     numpy \
     matplotlib \
