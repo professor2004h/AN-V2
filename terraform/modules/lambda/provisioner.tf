@@ -56,7 +56,6 @@ def lambda_handler(event, context):
             cluster=os.environ['ECS_CLUSTER'],
             taskDefinition=os.environ['TASK_DEFINITION'],
             count=1,
-            launchType='FARGATE',
             networkConfiguration={
                 'awsvpcConfiguration': {
                     'subnets': os.environ['SUBNETS'].split(','),
