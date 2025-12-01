@@ -89,10 +89,25 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name  = "PORT"
           value = "3001"
+        }
+      ]
+
+      secrets = [
+        {
+          name      = "SUPABASE_URL"
+          valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:apranova/production/supabase-74motf:SUPABASE_URL::"
         },
         {
-          name  = "SUPABASE_URL"
-          value = var.supabase_url
+          name      = "SUPABASE_ANON_KEY"
+          valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:apranova/production/supabase-74motf:SUPABASE_ANON_KEY::"
+        },
+        {
+          name      = "SUPABASE_SERVICE_ROLE_KEY"
+          valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:apranova/production/supabase-74motf:SUPABASE_SERVICE_ROLE_KEY::"
+        },
+        {
+          name      = "JWT_SECRET"
+          valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:apranova/production/supabase-74motf:JWT_SECRET::"
         }
       ]
 

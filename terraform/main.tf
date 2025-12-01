@@ -117,7 +117,10 @@ module "ecs" {
   
   # Supabase
   supabase_url = var.supabase_url
-  
+
+  # AWS Account
+  aws_account_id = var.aws_account_id
+
   tags = var.tags
 }
 

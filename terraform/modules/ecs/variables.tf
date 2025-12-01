@@ -87,6 +87,11 @@ variable "supabase_url" {
   type        = string
 }
 
+variable "aws_account_id" {
+  description = "AWS account ID"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)
