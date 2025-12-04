@@ -174,6 +174,49 @@ export default function WorkspacePage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [workspace?.status])
 
+  // Dead workspace detection
+  const [isWorkspaceDead, setIsWorkspaceDead] = useState(false)
+
+  useEffect(() => {
+    if (!workspace?.url || workspace.status !== 'running') {
+      setIsWorkspaceDead(false)
+      return
+    }
+
+    // Check if workspace is actually reachable
+    const checkWorkspaceHealth = async () => {
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+        const response = await fetch(workspace.url, {
+          method: 'HEAD',
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        // If we get 504 Gateway Timeout, workspace is dead
+        if (response.status === 504 || response.status === 502 || response.status === 503) {
+          setIsWorkspaceDead(true)
+        } else {
+          setIsWorkspaceDead(false)
+        }
+      } catch (error) {
+        // Network error or timeout means workspace is probably dead
+        setIsWorkspaceDead(true)
+      }
+    }
+
+    // Check immediately
+    checkWorkspaceHealth()
+
+    // Then check every 30 seconds
+    const interval = setInterval(checkWorkspaceHealth, 30000)
+
+    return () => clearInterval(interval)
+  }, [workspace?.url, workspace?.status])
+
   if (isLoading) {
     return <LoadingSpinner />
   }
@@ -271,7 +314,7 @@ export default function WorkspacePage() {
                   <code className="flex-1 bg-muted px-3 py-2 rounded text-sm">
                     {workspace.url}
                   </code>
-                  {workspace.status === 'running' && (
+                  {workspace.status === 'running' && !isWorkspaceDead && (
                     <Button asChild size="sm">
                       <a href={workspace.url} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-4 w-4 mr-2" />
@@ -280,6 +323,26 @@ export default function WorkspacePage() {
                     </Button>
                   )}
                 </div>
+
+                {isWorkspaceDead && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Workspace is not responding.</strong> The container may have been terminated.
+                      <br />
+                      <span className="text-xs">Don't worry! Your files are safe on persistent storage.</span>
+                      <br />
+                      <Button
+                        onClick={handleProvisionWithProgress}
+                        disabled={isProvisioning}
+                        className="mt-2"
+                        size="sm"
+                      >
+                        Reprovision Workspace
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               {workspace.status === 'error' && (
