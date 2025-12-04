@@ -89,6 +89,14 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name  = "PORT"
           value = "3001"
+        },
+        {
+          name  = "FRONTEND_URL"
+          value = "https://ecombinators.com"
+        },
+        {
+          name  = "BACKEND_URL"
+          value = "https://api.ecombinators.com"
         }
       ]
 
