@@ -14,7 +14,6 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-COPY .env.production .env.local
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
@@ -22,9 +21,9 @@ COPY .env.production .env.local
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build arguments for environment variables
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ARG NEXT_PUBLIC_BACKEND_URL
+ARG NEXT_PUBLIC_SUPABASE_URL=https://phlkhoorckdjriswcpwz.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBobGtob29yY2tkanJpc3djcHd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3ODY4NjgsImV4cCI6MjA3OTM2Mjg2OH0.t21pP6GBro-33s29jGSqg0KsdMTE8HP1gzE-j3VlHOs
+ARG NEXT_PUBLIC_BACKEND_URL=https://api.ecombinators.com
 ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
 # Set environment variables for build

@@ -27,6 +27,7 @@ RUN adduser --system --uid 1001 expressjs
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json* ./
+COPY --from=builder /app/.env ./.env
 
 # Install production dependencies only
 RUN npm install --only=production

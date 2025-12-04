@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { workspaceService } from '../services/workspaceService';
+import { workspaceServiceAWS as workspaceService } from '../services/workspaceServiceAWS';
 import { supabaseAdmin } from '../lib/supabase';
 
 const router = Router();
