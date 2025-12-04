@@ -141,6 +141,10 @@ module "lambda" {
   codeserver_task_definition_arn = module.ecs.codeserver_task_definition_arn
   codeserver_security_group_id = module.ecs.ecs_security_group_id
 
+  # ALB configuration for workspace routing
+  alb_arn          = module.alb.alb_arn
+  alb_listener_arn = module.alb.https_listener_arn
+
   workspace_inactivity_timeout = var.workspace_inactivity_timeout
 
   tags = var.tags

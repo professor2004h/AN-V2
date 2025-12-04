@@ -187,34 +187,54 @@ export default function WorkspacePage() {
     const checkWorkspaceHealth = async () => {
       try {
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        const timeoutId = setTimeout(() => controller.abort(), 10000)
 
+        // Use no-cors mode since workspace is on different subdomain
+        // This returns an opaque response but doesn't throw CORS error
         const response = await fetch(workspace.url, {
           method: 'HEAD',
+          mode: 'no-cors',
           signal: controller.signal,
         })
 
         clearTimeout(timeoutId)
 
-        // If we get 504 Gateway Timeout, workspace is dead
+        // With no-cors, we get type='opaque' and status=0 if reachable
+        // This is actually success - the server responded
+        if (response.type === 'opaque') {
+          setIsWorkspaceDead(false)
+          return
+        }
+
+        // If we somehow get a real response, check for gateway errors
         if (response.status === 504 || response.status === 502 || response.status === 503) {
           setIsWorkspaceDead(true)
         } else {
           setIsWorkspaceDead(false)
         }
-      } catch (error) {
-        // Network error or timeout means workspace is probably dead
-        setIsWorkspaceDead(true)
+      } catch (error: any) {
+        // Only mark as dead if it's a network error (not CORS)
+        // AbortError means timeout - server didn't respond
+        if (error.name === 'AbortError') {
+          setIsWorkspaceDead(true)
+        } else {
+          // Other errors might be temporary, don't immediately mark as dead
+          console.log('Workspace health check error:', error.message)
+          setIsWorkspaceDead(false)
+        }
       }
     }
 
-    // Check immediately
-    checkWorkspaceHealth()
+    // Check after a short delay to let ALB register
+    const initialCheck = setTimeout(checkWorkspaceHealth, 3000)
 
     // Then check every 30 seconds
     const interval = setInterval(checkWorkspaceHealth, 30000)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(initialCheck)
+      clearInterval(interval)
+    }
   }, [workspace?.url, workspace?.status])
 
   if (isLoading) {

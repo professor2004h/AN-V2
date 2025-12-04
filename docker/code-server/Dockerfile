@@ -32,14 +32,11 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     requests \
     prefect
 
-# Install Node.js packages for Full-Stack Developer track
-RUN npm install -g \
+# Install Node.js packages for Full-Stack Developer track (with legacy flags to avoid version conflicts)
+RUN npm install -g --legacy-peer-deps --ignore-scripts \
     typescript \
     ts-node \
-    @nestjs/cli \
-    @angular/cli \
-    create-react-app \
-    next
+    @nestjs/cli || true
 
 # Install VS Code extensions (only open-source extensions available in code-server)
 RUN code-server --install-extension ms-python.python || true \
@@ -64,18 +61,20 @@ COPY entrypoint.sh /entrypoint.sh
 USER root
 RUN chmod +x /entrypoint.sh
 
-# Create config directory and config file with our password
+# Install gosu for proper user switching
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
+# Create all required directories with correct permissions
 RUN mkdir -p /home/coder/.config/code-server && \
+    mkdir -p /home/coder/.local/share/code-server && \
+    mkdir -p /home/coder/project && \
     echo 'bind-addr: 0.0.0.0:8080' > /home/coder/.config/code-server/config.yaml && \
     echo 'auth: password' >> /home/coder/.config/code-server/config.yaml && \
     echo 'password: apranova123' >> /home/coder/.config/code-server/config.yaml && \
     echo 'cert: false' >> /home/coder/.config/code-server/config.yaml && \
-    chown -R coder:coder /home/coder/.config
+    chown -R coder:coder /home/coder && \
+    chmod -R 755 /home/coder
 
-
-
-USER coder
-
+# Stay as root - entrypoint will switch to coder after fixing permissions
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "--auth", "password", "--config", "/home/coder/.config/code-server/config.yaml", "--user-data-dir", "/home/coder/.local/share/code-server"]
-

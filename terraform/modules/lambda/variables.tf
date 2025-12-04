@@ -53,8 +53,24 @@ variable "workspace_inactivity_timeout" {
   default     = 15
 }
 
+variable "alb_arn" {
+  description = "ALB ARN for workspace routing"
+  type        = string
+}
+
+variable "alb_listener_arn" {
+  description = "ALB HTTPS listener ARN for workspace routing"
+  type        = string
+}
+
+variable "codeserver_password" {
+  description = "Password for Code-Server authentication"
+  type        = string
+  default     = "apranova123"
+  sensitive   = true
+}
+
 variable "tags" {
   description = "Common tags"
   type        = map(string)
 }
-
