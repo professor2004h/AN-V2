@@ -63,3 +63,19 @@ terraform.tfvars
 # Lambda artifacts
 lambda_provisioner.zip
 *.zip
+# Test and debug files
+payload*.json
+response*.json
+*.md
+!README.md
+!CONTRIBUTING.md
+lambda_env*.json
+task_def.json
+new_task_def.json
+elb_policy.json
+lambda_invoke_policy.json
+key.json
+cleanup_alb_rules.ps1
+clear_dynamodb.py
+update_task*.js
+update_task*.py
