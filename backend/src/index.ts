@@ -79,10 +79,14 @@ const server = app.listen(config.port, () => {
   logger.info(`📝 Environment: ${config.nodeEnv}`);
   logger.info(`🌐 Frontend URL: ${config.frontendUrl}`);
 
-  // Schedule workspace cleanup every minute
+  // DISABLED: This cleanup loop was terminating AWS workspaces incorrectly
+  // It uses local Docker commands which don't work with ECS Fargate
+  // TODO: Implement proper AWS-based cleanup via Lambda
+  /*
   setInterval(() => {
     workspaceService.cleanupWorkspaces();
   }, 60 * 1000);
+  */
 });
 
 // Graceful shutdown

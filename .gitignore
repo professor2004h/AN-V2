@@ -19,6 +19,7 @@ out/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
 # IDE
 .vscode/
@@ -58,3 +59,7 @@ tmp/
 
 # Secrets
 terraform.tfvars
+
+# Lambda artifacts
+lambda_provisioner.zip
+*.zip

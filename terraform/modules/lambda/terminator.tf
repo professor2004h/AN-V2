@@ -169,25 +169,26 @@ resource "aws_lambda_function" "terminator" {
 }
 
 # CloudWatch Event Rule - Check every 5 minutes
-resource "aws_cloudwatch_event_rule" "check_inactive" {
-  name                = "${var.project_name}-${var.environment}-check-inactive-workspaces"
-  description         = "Check for inactive workspaces every 5 minutes"
-  schedule_expression = "rate(5 minutes)"
-
-  tags = var.tags
-}
-
-resource "aws_cloudwatch_event_target" "check_inactive" {
-  rule      = aws_cloudwatch_event_rule.check_inactive.name
-  target_id = "workspace-terminator"
-  arn       = aws_lambda_function.terminator.arn
-}
-
-resource "aws_lambda_permission" "allow_cloudwatch" {
-  statement_id  = "AllowExecutionFromCloudWatch"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.terminator.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.check_inactive.arn
-}
+# DISABLED: Auto-termination disabled to prevent workspace interruptions
+# resource "aws_cloudwatch_event_rule" "check_inactive" {
+#   name                = "${var.project_name}-${var.environment}-check-inactive-workspaces"
+#   description         = "Check for inactive workspaces every 5 minutes"
+#   schedule_expression = "rate(5 minutes)"
+# 
+#   tags = var.tags
+# }
+# 
+# resource "aws_cloudwatch_event_target" "check_inactive" {
+#   rule      = aws_cloudwatch_event_rule.check_inactive.name
+#   target_id = "workspace-terminator"
+#   arn       = aws_lambda_function.terminator.arn
+# }
+# 
+# resource "aws_lambda_permission" "allow_cloudwatch" {
+#   statement_id  = "AllowExecutionFromCloudWatch"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.terminator.function_name
+#   principal     = "events.amazonaws.com"
+#   source_arn    = aws_cloudwatch_event_rule.check_inactive.arn
+# }
 

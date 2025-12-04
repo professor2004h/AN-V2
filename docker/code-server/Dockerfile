@@ -59,5 +59,23 @@ USER coder
 # Expose port
 EXPOSE 8080
 
-CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "--auth", "password"]
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+USER root
+RUN chmod +x /entrypoint.sh
+
+# Create config directory and config file with our password
+RUN mkdir -p /home/coder/.config/code-server && \
+    echo 'bind-addr: 0.0.0.0:8080' > /home/coder/.config/code-server/config.yaml && \
+    echo 'auth: password' >> /home/coder/.config/code-server/config.yaml && \
+    echo 'password: apranova123' >> /home/coder/.config/code-server/config.yaml && \
+    echo 'cert: false' >> /home/coder/.config/code-server/config.yaml && \
+    chown -R coder:coder /home/coder/.config
+
+
+
+USER coder
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "--auth", "password", "--config", "/home/coder/.config/code-server/config.yaml", "--user-data-dir", "/home/coder/.local/share/code-server"]
 
