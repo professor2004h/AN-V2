@@ -1,0 +1,14 @@
+{
+    "Variables":  {
+                      "ECS_CLUSTER":  "apranova-lms-production-cluster",
+                      "TASK_DEFINITION":  "arn:aws:ecs:us-east-1:038839713355:task-definition/apranova-lms-production-codeserver:6",
+                      "SUBNETS":  "subnet-0a70a8aa5cfa4f856,subnet-026526520168624b1,subnet-01d2c34eb300a2490",
+                      "SECURITY_GROUP":  "sg-067b49b7f62ab7d6f",
+                      "DYNAMODB_TABLE":  "apranova-lms-production-workspaces",
+                      "DOMAIN":  "ecombinators.com",
+                      "VPC_ID":  "vpc-086cdf543f96bf283",
+                      "ALB_ARN":  "arn:aws:elasticloadbalancing:us-east-1:038839713355:loadbalancer/app/apranova-lms-production-alb/8eaa77f82d7a7697",
+                      "ALB_LISTENER_ARN":  "arn:aws:elasticloadbalancing:us-east-1:038839713355:listener/app/apranova-lms-production-alb/8eaa77f82d7a7697/f36823ec005e2eea",
+                      "PASSWORD":  "apranova123"
+                  }
+}
