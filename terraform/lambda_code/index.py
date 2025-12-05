@@ -143,9 +143,10 @@ def lambda_handler(event, context):
             serviceName=service_name,
             taskDefinition=os.environ['TASK_DEFINITION'],
             desiredCount=1,
-            # Use regular Fargate for reliability
+            # Fargate Spot for 70% cost savings, with Fargate fallback
             capacityProviderStrategy=[
-                {'capacityProvider': 'FARGATE', 'weight': 1, 'base': 1}
+                {'capacityProvider': 'FARGATE_SPOT', 'weight': 1, 'base': 0},
+                {'capacityProvider': 'FARGATE', 'weight': 0, 'base': 1}  # Fallback if Spot unavailable
             ],
             platformVersion='LATEST',
             networkConfiguration={
