@@ -1,5 +1,6 @@
 # Dockerfile for custom Code-Server with pre-installed tools
-FROM codercom/code-server:latest
+# Pin version for consistent deployments - update manually after testing
+FROM codercom/code-server:4.96.2
 
 USER root
 
