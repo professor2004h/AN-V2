@@ -82,4 +82,5 @@ echo "Auto-save: Every 1 second"
 echo "====================================="
 
 cd /home/coder/project
-exec gosu coder code-server --bind-addr 0.0.0.0:8080 /home/coder/project
+# Use proxy-domain to tell code-server it's behind ALB
+exec gosu coder code-server --bind-addr 0.0.0.0:8080 --proxy-domain ecombinators.com /home/coder/project
