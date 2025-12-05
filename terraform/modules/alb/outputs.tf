@@ -1,4 +1,4 @@
-# ============================================
+﻿# ============================================
 # ALB MODULE OUTPUTS
 # ============================================
 
@@ -37,10 +37,11 @@ output "http_listener_arn" {
   value       = aws_lb_listener.http.arn
 }
 
-output "https_listener_arn" {
-  description = "HTTPS listener ARN"
-  value       = aws_lb_listener.https.arn
-}
+# HTTPS listener output commented - listener managed manually in AWS
+# output "https_listener_arn" {
+#   description = "HTTPS listener ARN"
+#   value       = aws_lb_listener.https.arn
+# }
 
 output "frontend_target_group_arn" {
   description = "Frontend target group ARN"
@@ -62,4 +63,5 @@ output "codeserver_target_group_arn" {
 #   description = "ACM certificate ARN"
 #   value       = aws_acm_certificate.main.arn
 # }
+
 
