@@ -122,8 +122,20 @@ def lambda_handler(event, context):
                 Actions=[{'Type': 'forward', 'TargetGroupArn': tg_arn}],
                 Priority=priority
             )
-        except:
-            pass
+            print(f"Created ALB rule for {service_name}.{domain} with priority {priority}")
+        except Exception as e:
+            print(f"ALB rule creation result: {e}")
+            # Try to verify rule exists
+            try:
+                for rule in rules['Rules']:
+                    if rule.get('Conditions'):
+                        for cond in rule['Conditions']:
+                            vals = cond.get('HostHeaderConfig', {}).get('Values', [])
+                            if f"{service_name}.{domain}" in vals:
+                                print(f"ALB rule already exists for {service_name}.{domain}")
+                                break
+            except:
+                pass
         
         # Create ECS Service with FARGATE_SPOT and STUDENT_ID override
         ecs.create_service(
