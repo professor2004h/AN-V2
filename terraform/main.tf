@@ -1,4 +1,4 @@
-# ============================================
+﻿# ============================================
 # APRANOVA LMS - MAIN TERRAFORM CONFIGURATION
 # ============================================
 
@@ -143,7 +143,7 @@ module "lambda" {
 
   # ALB configuration for workspace routing
   alb_arn          = module.alb.alb_arn
-  alb_listener_arn = module.alb.https_listener_arn
+  alb_listener_arn = module.alb.http_listener_arn  # HTTPS listener managed manually in AWS
 
   workspace_inactivity_timeout = var.workspace_inactivity_timeout
 
@@ -183,4 +183,5 @@ module "redis" {
 
   tags = var.tags
 }
+
 
