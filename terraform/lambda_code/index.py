@@ -21,7 +21,7 @@ def lambda_handler(event, context):
         domain = os.environ['DOMAIN']
         workspace_url = f"https://{service_name}.{domain}"
         
-        # Check if service already exists and is healthy
+        # Check if service already exists
         try:
             existing = ecs.describe_services(
                 cluster=os.environ['ECS_CLUSTER'],
@@ -31,7 +31,6 @@ def lambda_handler(event, context):
                 running_count = existing['services'][0]['runningCount']
                 if running_count > 0:
                     return response(200, {'workspace_url': workspace_url, 'status': 'running'})
-                # Service exists but not running, update desired count
                 ecs.update_service(
                     cluster=os.environ['ECS_CLUSTER'],
                     service=service_name,
@@ -41,7 +40,7 @@ def lambda_handler(event, context):
         except:
             pass
         
-        # Create target group with stickiness for WebSocket
+        # Create target group with stickiness
         tg_name = f"ws-{short_id}"[:32]
         try:
             tg_response = elbv2.create_target_group(
@@ -55,20 +54,24 @@ def lambda_handler(event, context):
                 HealthCheckTimeoutSeconds=10,
                 HealthyThresholdCount=2,
                 UnhealthyThresholdCount=3,
-                Matcher={'HttpCode': '200-399'},
-                TargetGroupAttributes=[
+                Matcher={'HttpCode': '200-399'}
+            )
+            tg_arn = tg_response['TargetGroups'][0]['TargetGroupArn']
+            # Enable stickiness
+            elbv2.modify_target_group_attributes(
+                TargetGroupArn=tg_arn,
+                Attributes=[
                     {'Key': 'stickiness.enabled', 'Value': 'true'},
                     {'Key': 'stickiness.type', 'Value': 'lb_cookie'},
                     {'Key': 'stickiness.lb_cookie.duration_seconds', 'Value': '86400'},
                     {'Key': 'deregistration_delay.timeout_seconds', 'Value': '30'}
                 ]
             )
-            tg_arn = tg_response['TargetGroups'][0]['TargetGroupArn']
         except elbv2.exceptions.DuplicateTargetGroupNameException:
             tg_response = elbv2.describe_target_groups(Names=[tg_name])
             tg_arn = tg_response['TargetGroups'][0]['TargetGroupArn']
         
-        # Create ALB rule for HTTPS listener
+        # Create ALB rule
         listener_arn = os.environ['ALB_LISTENER_ARN']
         rules = elbv2.describe_rules(ListenerArn=listener_arn)
         priorities = [int(r['Priority']) for r in rules['Rules'] if r['Priority'] != 'default']
@@ -84,13 +87,17 @@ def lambda_handler(event, context):
         except:
             pass
         
-        # Create ECS Service with STUDENT_ID environment variable override
+        # Create ECS Service with FARGATE_SPOT and STUDENT_ID override
         ecs.create_service(
             cluster=os.environ['ECS_CLUSTER'],
             serviceName=service_name,
             taskDefinition=os.environ['TASK_DEFINITION'],
             desiredCount=1,
-            launchType='FARGATE',
+            # Use Fargate Spot for 70% cost savings!
+            capacityProviderStrategy=[
+                {'capacityProvider': 'FARGATE_SPOT', 'weight': 4, 'base': 0},
+                {'capacityProvider': 'FARGATE', 'weight': 1, 'base': 0}
+            ],
             platformVersion='LATEST',
             networkConfiguration={
                 'awsvpcConfiguration': {
@@ -118,7 +125,9 @@ def lambda_handler(event, context):
             propagateTags='SERVICE'
         )
         
-        # Store in DynamoDB
+        # Update task with STUDENT_ID environment variable via task override
+        # This is done automatically by the task definition template
+        
         table.put_item(Item={
             'student_id': student_id,
             'service_name': service_name,
