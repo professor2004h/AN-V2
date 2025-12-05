@@ -7,6 +7,41 @@ ecs = boto3.client('ecs')
 elbv2 = boto3.client('elbv2')
 dynamodb = boto3.resource('dynamodb')
 
+def ensure_alb_rule(service_name, domain, short_id):
+    """Ensure ALB rule exists for the workspace"""
+    listener_arn = os.environ['ALB_LISTENER_ARN']
+    tg_name = f"ws-{short_id}"[:32]
+    
+    try:
+        tg_response = elbv2.describe_target_groups(Names=[tg_name])
+        tg_arn = tg_response['TargetGroups'][0]['TargetGroupArn']
+    except:
+        return  # No target group means fresh provision needed
+    
+    # Check if rule already exists
+    rules = elbv2.describe_rules(ListenerArn=listener_arn)
+    for rule in rules['Rules']:
+        if rule.get('Conditions'):
+            for cond in rule['Conditions']:
+                if cond.get('HostHeaderConfig', {}).get('Values', []):
+                    if f"{service_name}.{domain}" in cond['HostHeaderConfig']['Values']:
+                        return  # Rule exists
+    
+    # Create rule if missing
+    priorities = [int(r['Priority']) for r in rules['Rules'] if r['Priority'] != 'default']
+    priority = max(priorities) + 1 if priorities else 100
+    
+    try:
+        elbv2.create_rule(
+            ListenerArn=listener_arn,
+            Conditions=[{'Field': 'host-header', 'Values': [f"{service_name}.{domain}"]}],
+            Actions=[{'Type': 'forward', 'TargetGroupArn': tg_arn}],
+            Priority=priority
+        )
+        print(f"Created ALB rule for {service_name}.{domain}")
+    except Exception as e:
+        print(f"Failed to create ALB rule: {e}")
+
 def lambda_handler(event, context):
     try:
         body = json.loads(event.get('body', '{}')) if isinstance(event.get('body'), str) else event.get('body', {})
@@ -28,6 +63,9 @@ def lambda_handler(event, context):
                 services=[service_name]
             )
             if existing['services'] and existing['services'][0]['status'] == 'ACTIVE':
+                # Service exists - ensure ALB rule also exists
+                ensure_alb_rule(service_name, domain, short_id)
+                
                 running_count = existing['services'][0]['runningCount']
                 if running_count > 0:
                     return response(200, {'workspace_url': workspace_url, 'status': 'running'})
