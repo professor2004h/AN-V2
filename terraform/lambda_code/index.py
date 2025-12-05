@@ -137,16 +137,15 @@ def lambda_handler(event, context):
             except:
                 pass
         
-        # Create ECS Service with FARGATE_SPOT and STUDENT_ID override
+        # Create ECS Service with OpenVSCode Server
         ecs.create_service(
             cluster=os.environ['ECS_CLUSTER'],
             serviceName=service_name,
             taskDefinition=os.environ['TASK_DEFINITION'],
             desiredCount=1,
-            # Use Fargate Spot for 70% cost savings!
+            # Use regular Fargate for reliability
             capacityProviderStrategy=[
-                {'capacityProvider': 'FARGATE_SPOT', 'weight': 4, 'base': 0},
-                {'capacityProvider': 'FARGATE', 'weight': 1, 'base': 0}
+                {'capacityProvider': 'FARGATE', 'weight': 1, 'base': 1}
             ],
             platformVersion='LATEST',
             networkConfiguration={
