@@ -1,61 +1,63 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -e
 
-# Get student ID from environment (set by Lambda during task launch)
 STUDENT_ID=${STUDENT_ID:-default}
-
 echo "Setting up workspace for student: $STUDENT_ID"
 
-# Create student-specific directory structure on EFS
-# The EFS is mounted at /efs-data
+# EFS mount and student directory
 EFS_STUDENT_DIR="/efs-data/students/${STUDENT_ID}"
-
-# Create the student's directory if it doesn't exist
 mkdir -p "${EFS_STUDENT_DIR}"
-
-# Set ownership to coder user (uid 1000, gid 1000)
 chown -R 1000:1000 "${EFS_STUDENT_DIR}"
 chmod -R 755 "${EFS_STUDENT_DIR}"
-
-# Ensure the /efs-data/students directory has correct permissions
 chown -R 1000:1000 /efs-data/students 2>/dev/null || true
-chmod -R 755 /efs-data/students 2>/dev/null || true
+echo "Created EFS directory: ${EFS_STUDENT_DIR}"
 
-echo "Created and set permissions for: ${EFS_STUDENT_DIR}"
-
-# Create project directory as a symlink to student's EFS directory
-# Remove existing project directory first
+# Symlink /home/coder/project to EFS
 rm -rf /home/coder/project 2>/dev/null || true
-
-# Create the symlink
 ln -sf "${EFS_STUDENT_DIR}" /home/coder/project
 chown -h 1000:1000 /home/coder/project
+echo "Symlink: /home/coder/project -> ${EFS_STUDENT_DIR}"
 
-echo "Student workspace linked: /home/coder/project -> ${EFS_STUDENT_DIR}"
-
-# Ensure all required directories exist with correct permissions
+# Create required directories
 mkdir -p /home/coder/.config/code-server
 mkdir -p /home/coder/.local/share/code-server
+mkdir -p /home/coder/.local/share/code-server/User
 
-# Make sure /home/coder is fully writable
-chown -R 1000:1000 /home/coder
-chmod -R 755 /home/coder
+# VS Code settings: Auto-save every 1 second, default folder is /home/coder/project
+cat > /home/coder/.local/share/code-server/User/settings.json << 'SETTINGS'
+{
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "window.restoreWindows": "all",
+    "workbench.startupEditor": "none",
+    "files.hotExit": "onExitAndWindowClose",
+    "editor.formatOnSave": true,
+    "terminal.integrated.cwd": "/home/coder/project",
+    "explorer.confirmDelete": false,
+    "git.autofetch": true,
+    "files.exclude": {
+        "**/node_modules": true,
+        "**/.git": false
+    }
+}
+SETTINGS
 
-# Create config file if it doesn't exist
-if [ ! -f /home/coder/.config/code-server/config.yaml ]; then
-    cat > /home/coder/.config/code-server/config.yaml << EOF
+# Code-server config
+cat > /home/coder/.config/code-server/config.yaml << EOF
 bind-addr: 0.0.0.0:8080
 auth: password
 password: ${PASSWORD:-apranova123}
 cert: false
+user-data-dir: /home/coder/.local/share/code-server
 EOF
-    chown 1000:1000 /home/coder/.config/code-server/config.yaml
-fi
 
-echo "Starting Code-Server as user coder..."
+# Set permissions
+chown -R 1000:1000 /home/coder
+chmod -R 755 /home/coder
 
-# Change to a valid directory before starting
-cd "${EFS_STUDENT_DIR}"
+echo "Auto-save enabled: 1 second delay"
+echo "Default folder: /home/coder/project"
+echo "Starting Code-Server..."
 
-# Switch to coder user and execute the command with explicit working dir
-exec gosu coder "$@"
+cd /home/coder/project
+exec gosu coder code-server --bind-addr 0.0.0.0:8080 /home/coder/project
