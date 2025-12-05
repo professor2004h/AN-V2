@@ -84,7 +84,7 @@ def lambda_handler(event, context):
             tg_response = elbv2.create_target_group(
                 Name=tg_name,
                 Protocol='HTTP',
-                Port=8080,
+                Port=3000,
                 VpcId=os.environ['VPC_ID'],
                 TargetType='ip',
                 HealthCheckPath='/',
@@ -158,8 +158,8 @@ def lambda_handler(event, context):
             },
             loadBalancers=[{
                 'targetGroupArn': tg_arn,
-                'containerName': 'codeserver',
-                'containerPort': 8080
+                'containerName': 'openvscode',
+                'containerPort': 3000
             }],
             healthCheckGracePeriodSeconds=120,
             deploymentConfiguration={
