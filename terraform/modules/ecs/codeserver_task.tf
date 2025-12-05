@@ -1,4 +1,4 @@
-# ============================================
+﻿# ============================================
 # CODE-SERVER WORKSPACE TASK DEFINITION
 # Synced with AWS Task Definition v4
 # ============================================
@@ -140,7 +140,7 @@ resource "aws_ecs_task_definition" "codeserver_idle" {
       mountPoints = [
         {
           sourceVolume  = "workspace-data"
-          containerPath = "/home/coder"
+          containerPath = "/efs-data"
           readOnly      = false
         }
       ]
@@ -148,7 +148,7 @@ resource "aws_ecs_task_definition" "codeserver_idle" {
       environment = [
         {
           name  = "PASSWORD"
-          value = "apranova_secure_ide"
+          value = "apranova123"
         }
       ]
 
@@ -162,7 +162,7 @@ resource "aws_ecs_task_definition" "codeserver_idle" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
         interval    = 30
         timeout     = 10
         retries     = 3
@@ -176,4 +176,5 @@ resource "aws_ecs_task_definition" "codeserver_idle" {
     Purpose   = "student-ide-cost-optimized"
   })
 }
+
 
