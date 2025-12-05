@@ -68,12 +68,15 @@ RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /home/coder/.config/code-server && \
     mkdir -p /home/coder/.local/share/code-server && \
     mkdir -p /home/coder/project && \
+    mkdir -p /efs-data/students && \
     echo 'bind-addr: 0.0.0.0:8080' > /home/coder/.config/code-server/config.yaml && \
     echo 'auth: password' >> /home/coder/.config/code-server/config.yaml && \
     echo 'password: apranova123' >> /home/coder/.config/code-server/config.yaml && \
     echo 'cert: false' >> /home/coder/.config/code-server/config.yaml && \
     chown -R coder:coder /home/coder && \
-    chmod -R 755 /home/coder
+    chown -R coder:coder /efs-data && \
+    chmod -R 755 /home/coder && \
+    chmod -R 755 /efs-data
 
 # Stay as root - entrypoint will switch to coder after fixing permissions
 ENTRYPOINT ["/entrypoint.sh"]

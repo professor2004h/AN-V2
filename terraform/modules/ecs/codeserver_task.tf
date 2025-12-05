@@ -1,15 +1,15 @@
 # ============================================
 # CODE-SERVER WORKSPACE TASK DEFINITION
-# Critical: Enterprise-grade IDE with zero errors
+# Synced with AWS Task Definition v4
 # ============================================
 
-# Code-Server Task Definition (Startup - High Resources)
+# Code-Server Task Definition
 resource "aws_ecs_task_definition" "codeserver" {
   family                   = "${var.project_name}-${var.environment}-codeserver"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "2048"  # 2 vCPU for fast IDE rendering
-  memory                   = "4096"  # 4 GB RAM for startup
+  cpu                      = "1024"  # 1 vCPU
+  memory                   = "2048"  # 2 GB RAM
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
@@ -31,20 +31,23 @@ resource "aws_ecs_task_definition" "codeserver" {
     {
       name      = "codeserver"
       image     = "${var.codeserver_ecr_url}:latest"
+      cpu       = 1024
+      memory    = 2048
       essential = true
 
       portMappings = [
         {
           containerPort = 8080
+          hostPort      = 8080
           protocol      = "tcp"
         }
       ]
 
-      # Mount EFS for persistent code storage
+      # Mount EFS at /efs-data - entrypoint creates student-specific directories
       mountPoints = [
         {
           sourceVolume  = "workspace-data"
-          containerPath = "/home/coder"
+          containerPath = "/efs-data"
           readOnly      = false
         }
       ]
@@ -52,7 +55,7 @@ resource "aws_ecs_task_definition" "codeserver" {
       environment = [
         {
           name  = "PASSWORD"
-          value = "apranova_secure_ide"
+          value = "apranova123"
         },
         {
           name  = "TZ"
@@ -69,21 +72,19 @@ resource "aws_ecs_task_definition" "codeserver" {
         }
       }
 
-      # Health check for ALB - critical for stability
+      # Health check - use / since code-server returns 302 redirect
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
         interval    = 30
         timeout     = 10
         retries     = 3
-        startPeriod = 120  # 2 minutes for IDE to fully load
+        startPeriod = 120
       }
 
-      # Resource limits
       linuxParameters = {
         initProcessEnabled = true
       }
 
-      # Ulimits for better performance
       ulimits = [
         {
           name      = "nofile"
