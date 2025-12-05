@@ -27,9 +27,30 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
+
+// CORS - Allow multiple origins for production
+const allowedOrigins = [
+  'https://ecombinators.com',
+  'https://www.ecombinators.com',
+  'https://app.ecombinators.com',
+  config.frontendUrl,
+].filter(Boolean);
+
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, false);
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 // Rate limiting
