@@ -85,7 +85,9 @@ export class WorkspaceServiceAWS {
             sendProgress('Workspace provisioned successfully', 70);
 
             const workspaceUrl = workspaceData.workspace_url;
-            const status = workspaceData.status || 'running';
+            // Always set to 'running' after successful Lambda call
+            // Lambda returns 'provisioning' but container will be ready shortly
+            const status = 'running';
 
             // Update student record with workspace URL
             sendProgress('Updating student record...', 80);
