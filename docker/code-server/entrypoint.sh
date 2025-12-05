@@ -2,40 +2,29 @@
 set -e
 
 STUDENT_ID=${STUDENT_ID:-default}
-echo "===== Code-Server Workspace Setup ====="
-echo "Student ID: $STUDENT_ID"
+echo "Setting up workspace for student: $STUDENT_ID"
 
-# EFS paths
+# EFS mount and student directory
 EFS_STUDENT_DIR="/efs-data/students/${STUDENT_ID}"
-EFS_VSCODE_DIR="/home/coder/.local/share/code-server"
-EFS_EXTENSIONS_DIR="${EFS_STUDENT_DIR}/.vscode-extensions"
-
-# Create student directory on EFS
 mkdir -p "${EFS_STUDENT_DIR}"
-mkdir -p "${EFS_EXTENSIONS_DIR}"
-chown -R 1000:1000 "${EFS_STUDENT_DIR}" 2>/dev/null || true
-chmod -R 755 "${EFS_STUDENT_DIR}" 2>/dev/null || true
+chown -R 1000:1000 "${EFS_STUDENT_DIR}"
+chmod -R 755 "${EFS_STUDENT_DIR}"
+chown -R 1000:1000 /efs-data/students 2>/dev/null || true
 echo "Created EFS directory: ${EFS_STUDENT_DIR}"
 
-# Symlink /home/coder/project to student EFS directory
+# Symlink /home/coder/project to EFS
 rm -rf /home/coder/project 2>/dev/null || true
 ln -sf "${EFS_STUDENT_DIR}" /home/coder/project
 chown -h 1000:1000 /home/coder/project
-echo "Symlink: /home/coder/project -> EFS"
+echo "Symlink: /home/coder/project -> ${EFS_STUDENT_DIR}"
 
 # Create required directories
 mkdir -p /home/coder/.config/code-server
-mkdir -p "${EFS_VSCODE_DIR}/User"
+mkdir -p /home/coder/.local/share/code-server
+mkdir -p /home/coder/.local/share/code-server/User
 
-# Symlink extensions to EFS (persistent!)
-rm -rf "${EFS_VSCODE_DIR}/extensions" 2>/dev/null || true
-mkdir -p "${EFS_EXTENSIONS_DIR}"
-ln -sf "${EFS_EXTENSIONS_DIR}" "${EFS_VSCODE_DIR}/extensions"
-chown -h 1000:1000 "${EFS_VSCODE_DIR}/extensions" 2>/dev/null || true
-echo "Extensions directory: EFS (persistent)"
-
-# VS Code settings with auto-save
-cat > "${EFS_VSCODE_DIR}/User/settings.json" << 'SETTINGS'
+# VS Code settings: Auto-save every 1 second, default folder is /home/coder/project
+cat > /home/coder/.local/share/code-server/User/settings.json << 'SETTINGS'
 {
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 1000,
@@ -46,22 +35,12 @@ cat > "${EFS_VSCODE_DIR}/User/settings.json" << 'SETTINGS'
     "terminal.integrated.cwd": "/home/coder/project",
     "explorer.confirmDelete": false,
     "git.autofetch": true,
-    "git.enableSmartCommit": true,
-    "workbench.colorTheme": "Default Dark Modern",
-    "editor.fontSize": 14,
-    "editor.tabSize": 2,
-    "editor.wordWrap": "on",
-    "editor.minimap.enabled": false,
-    "terminal.integrated.scrollback": 10000,
     "files.exclude": {
         "**/node_modules": true,
-        "**/__pycache__": true,
         "**/.git": false
-    },
-    "telemetry.telemetryLevel": "off"
+    }
 }
 SETTINGS
-chown 1000:1000 "${EFS_VSCODE_DIR}/User/settings.json" 2>/dev/null || true
 
 # Code-server config
 cat > /home/coder/.config/code-server/config.yaml << EOF
@@ -69,18 +48,16 @@ bind-addr: 0.0.0.0:8080
 auth: password
 password: ${PASSWORD:-apranova123}
 cert: false
-user-data-dir: ${EFS_VSCODE_DIR}
+user-data-dir: /home/coder/.local/share/code-server
 EOF
 
 # Set permissions
-chown -R 1000:1000 /home/coder 2>/dev/null || true
+chown -R 1000:1000 /home/coder
+chmod -R 755 /home/coder
 
-echo "====================================="
-echo "Student ID: $STUDENT_ID"
-echo "Project: /home/coder/project (EFS)"
-echo "Auto-save: Every 1 second"
-echo "====================================="
+echo "Auto-save enabled: 1 second delay"
+echo "Default folder: /home/coder/project"
+echo "Starting Code-Server..."
 
 cd /home/coder/project
-# Use proxy-domain to tell code-server it's behind ALB
-exec gosu coder code-server --bind-addr 0.0.0.0:8080 --proxy-domain ecombinators.com /home/coder/project
+exec gosu coder code-server --bind-addr 0.0.0.0:8080 /home/coder/project
