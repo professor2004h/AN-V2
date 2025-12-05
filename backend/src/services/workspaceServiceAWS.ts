@@ -82,19 +82,57 @@ export class WorkspaceServiceAWS {
                 workspaceData = result;
             }
 
-            sendProgress('Workspace provisioned successfully', 70);
-
             const workspaceUrl = workspaceData.workspace_url;
-            // Always set to 'running' after successful Lambda call
-            // Lambda returns 'provisioning' but container will be ready shortly
-            const status = 'running';
 
-            // Update student record with workspace URL
-            sendProgress('Updating student record...', 80);
+            // Update status to 'starting' while we wait for container
+            sendProgress('Container starting...', 70);
+            await supabaseAdmin
+                .from('students')
+                .update({
+                    workspace_status: 'starting',
+                    workspace_url: workspaceUrl,
+                })
+                .eq('id', studentId);
+
+            // Wait for container to be healthy (poll every 10 seconds, max 3 minutes)
+            sendProgress('Waiting for container to be ready...', 75);
+            const maxAttempts = 18; // 18 * 10 seconds = 3 minutes
+            let containerReady = false;
+
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                try {
+                    // Check if workspace URL is accessible
+                    const checkResponse = await fetch(workspaceUrl, {
+                        method: 'HEAD',
+                        signal: AbortSignal.timeout(5000)
+                    });
+
+                    if (checkResponse.status === 200 || checkResponse.status === 302) {
+                        containerReady = true;
+                        break;
+                    }
+                } catch (e) {
+                    // Container not ready yet, continue waiting
+                }
+
+                const progress = 75 + Math.floor((attempt / maxAttempts) * 20);
+                sendProgress(`Container starting... (${attempt * 10}s)`, progress);
+
+                // Wait 10 seconds before next check
+                await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+
+            if (!containerReady) {
+                // Still update to running but warn
+                console.warn(`Container may not be fully ready for student ${studentId}`);
+            }
+
+            // Update status to 'running' only after container is healthy
+            sendProgress('Container ready!', 95);
             const { data, error } = await supabaseAdmin
                 .from('students')
                 .update({
-                    workspace_status: status,
+                    workspace_status: 'running',
                     workspace_url: workspaceUrl,
                     workspace_last_activity: new Date().toISOString(),
                 })
@@ -105,16 +143,14 @@ export class WorkspaceServiceAWS {
             if (error) throw error;
 
             // Notify student
-            sendProgress('Sending notification...', 90);
-            await notificationService.notifyWorkspaceStatusChange(student.user_id, status);
-
             sendProgress('Workspace ready!', 100);
+            await notificationService.notifyWorkspaceStatusChange(student.user_id, 'running');
 
             return {
                 id: studentId,
                 studentId,
                 url: workspaceUrl,
-                status,
+                status: 'running',
             };
         } catch (error: any) {
             console.error(`AWS workspace provisioning error for student ${studentId}:`, error);

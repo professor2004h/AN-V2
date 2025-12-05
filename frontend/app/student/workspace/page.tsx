@@ -244,6 +244,7 @@ export default function WorkspacePage() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, any> = {
       running: 'success',
+      starting: 'warning',
       stopped: 'secondary',
       provisioning: 'warning',
       error: 'destructive',
