@@ -1,5 +1,6 @@
 # ============================================
 # LAMBDA MODULE VARIABLES
+# Synced with AWS - December 2024
 # ============================================
 
 variable "project_name" {
@@ -37,14 +38,28 @@ variable "ecs_cluster_name" {
   type        = string
 }
 
-variable "codeserver_task_definition_arn" {
-  description = "Code-Server task definition ARN"
+# OpenVSCode Server (current)
+variable "openvscode_task_definition_arn" {
+  description = "OpenVSCode Server task definition ARN"
   type        = string
 }
 
-variable "codeserver_security_group_id" {
-  description = "Code-Server security group ID"
+variable "workspace_security_group_id" {
+  description = "Workspace security group ID"
   type        = string
+}
+
+# Deprecated - for backwards compatibility
+variable "codeserver_task_definition_arn" {
+  description = "Code-Server task definition ARN (deprecated)"
+  type        = string
+  default     = ""
+}
+
+variable "codeserver_security_group_id" {
+  description = "Code-Server security group ID (deprecated)"
+  type        = string
+  default     = ""
 }
 
 variable "workspace_inactivity_timeout" {
@@ -63,8 +78,22 @@ variable "alb_listener_arn" {
   type        = string
 }
 
+variable "domain" {
+  description = "Domain for workspace URLs"
+  type        = string
+  default     = "ecombinators.com"
+}
+
+variable "workspace_password" {
+  description = "Password for workspace authentication (OpenVSCode uses connection token)"
+  type        = string
+  default     = "apranova123"
+  sensitive   = true
+}
+
+# Deprecated
 variable "codeserver_password" {
-  description = "Password for Code-Server authentication"
+  description = "Password for Code-Server authentication (deprecated)"
   type        = string
   default     = "apranova123"
   sensitive   = true

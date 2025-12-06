@@ -1,16 +1,15 @@
 # ============================================
 # WORKSPACE PROVISIONER LAMBDA
-# Creates new Code-Server containers for students
+# Creates OpenVSCode Server containers for students
+# Synced with AWS - December 2024
 # ============================================
 
-# Use external file for Lambda code (easier to maintain)
+# Lambda Code Archive
 data "archive_file" "provisioner" {
   type        = "zip"
-  source_file = "${path.root}/lambda_code/provisioner.py"
+  source_file = "${path.root}/lambda_code/index.py"
   output_path = "${path.module}/lambda_functions/provisioner.zip"
 }
-
-
 
 resource "aws_lambda_function" "provisioner" {
   filename         = data.archive_file.provisioner.output_path
@@ -30,15 +29,16 @@ resource "aws_lambda_function" "provisioner" {
   environment {
     variables = {
       ECS_CLUSTER      = var.ecs_cluster_name
-      TASK_DEFINITION  = var.codeserver_task_definition_arn
+      # Using OpenVSCode task definition (not codeserver)
+      TASK_DEFINITION  = var.openvscode_task_definition_arn
       SUBNETS          = join(",", var.private_subnets)
-      SECURITY_GROUP   = var.codeserver_security_group_id
+      SECURITY_GROUP   = var.workspace_security_group_id
       DYNAMODB_TABLE   = aws_dynamodb_table.workspaces.name
-      DOMAIN           = "ecombinators.com"
+      DOMAIN           = var.domain
       VPC_ID           = var.vpc_id
       ALB_ARN          = var.alb_arn
       ALB_LISTENER_ARN = var.alb_listener_arn
-      PASSWORD         = var.codeserver_password
+      PASSWORD         = var.workspace_password
     }
   }
 
@@ -47,3 +47,16 @@ resource "aws_lambda_function" "provisioner" {
   depends_on = [aws_cloudwatch_log_group.provisioner]
 }
 
+# CloudWatch Log Group for Lambda
+resource "aws_cloudwatch_log_group" "provisioner" {
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-workspace-provisioner"
+  retention_in_days = 14
+
+  tags = var.tags
+}
+
+# Output
+output "provisioner_function_arn" {
+  description = "ARN of the workspace provisioner Lambda"
+  value       = aws_lambda_function.provisioner.arn
+}

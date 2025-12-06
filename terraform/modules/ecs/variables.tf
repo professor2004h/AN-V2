@@ -63,7 +63,13 @@ variable "backend_ecr_url" {
 }
 
 variable "codeserver_ecr_url" {
-  description = "Code-Server ECR repository URL"
+  description = "Code-Server ECR repository URL (deprecated - use openvscode)"
+  type        = string
+  default     = ""
+}
+
+variable "openvscode_ecr_url" {
+  description = "OpenVSCode Server ECR repository URL"
   type        = string
 }
 

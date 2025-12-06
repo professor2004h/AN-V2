@@ -17,6 +17,11 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['ecombinators.com', 'www.ecombinators.com', 'localhost:3000'],
+    },
+  },
 }
 
 module.exports = nextConfig
